@@ -1,0 +1,25 @@
+{
+  "name": "scrim-s06iu6c",
+  "description": "https://scrimba.com/frontend-path-c0j/~03ec",
+  "scripts": {
+    "watch": "webpack -w",
+    "build": "webpack",
+    "start": "http-server -c-1"
+  },
+  "dependencies": {
+    "webpack": "^2.0"
+  },
+  "devDependencies": {
+    "babel-core": "^6.0",
+    "babel-loader": "^7.0",
+    "babel-preset-env": "*",
+    "babel-preset-react": "*",
+    "http-server": "^14.1.1",
+    "live-server": "^1.2.2"
+  },
+  "version": "1.0.0",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

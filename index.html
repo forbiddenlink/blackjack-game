@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Blackjack Game</title>
+        <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA/4QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAERERERERERERAAAAAAAAERAQAAAAAAEBEAEAAAAAEAEQABAAAAEAEQAAEAAAAQARAAEAAAABAREAARAAAAEAEQABEAAAAQARAAEQAAABEAEAAREAAAEQAAABEQAAEQAAAAERAAEQAAAAARERAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA">
+        <link rel="stylesheet" href="index.css">
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <script src="index.js" defer></script>
+    </head>
+    <body>
+        <div class="game-container">
+            <div class="game-header">
+                <h1>Blackjack</h1>
+                <div class="player-info">
+                    <div class="player-name-input">
+                        <input type="text" id="player-name-input" placeholder="Enter your name">
+                        <button id="set-name-btn">SET NAME</button>
+                    </div>
+                    <p id="player-el" class="player-stats"></p>
+                </div>
+            </div>
+            
+            <div class="instructions">
+                <div class="steps">
+                    <span>1. Enter name & SET NAME</span>
+                    <span>→</span>
+                    <span>2. Select bet amount</span>
+                    <span>→</span>
+                    <span>3. START GAME</span>
+                </div>
+            </div>
+            
+            <p id="message-el">Ready to play!</p>
+            
+            <div class="hands-container">
+                <div class="dealer-area">
+                    <h2>DEALER</h2>
+                    <div id="dealer-cards" class="cards-container"></div>
+                    <p id="dealer-sum-el">Sum: 0</p>
+                </div>
+                
+                <div class="player-area">
+                    <h3>PLAYER</h3>
+                    <div id="cards-el" class="cards-container"></div>
+                    <p id="sum-el">Sum: 0</p>
+                    <p id="current-bet">Current Bet: $0</p>
+                </div>
+            </div>
+
+            <div class="betting-area">
+                <div class="chip-denominations">
+                    <button class="chip-button" data-value="5">$5</button>
+                    <button class="chip-button" data-value="25">$25</button>
+                    <button class="chip-button" data-value="100">$100</button>
+                    <button class="chip-button" data-value="500">$500</button>
+                </div>
+            </div>
+
+            <div class="game-controls">
+                <button id="start-btn">START GAME</button>
+                <button id="hit-btn" disabled>HIT</button>
+                <button id="stand-btn" disabled>STAND</button>
+                <button id="double-btn" disabled>DOUBLE</button>
+            </div>
+        </div>
+
+        <div class="rules-section">
+            <h2>Blackjack Rules</h2>
+            <ul>
+                <li>Get as close to 21 as possible without going over</li>
+                <li>Face cards are worth 10, Aces are worth 1 or 11</li>
+                <li>Blackjack (Ace + 10) pays 3:2</li>
+                <li>Dealer must hit on 16 or less, stand on 17 or more</li>
+                <li>Double down: Double your bet and get one more card</li>
+                <li>Surrender: Give up half your bet and end the hand</li>
+            </ul>
+            <button id="got-it-btn">GOT IT!</button>
+        </div>
+    </body>
+</html>
