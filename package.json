@@ -1,25 +1,23 @@
 {
-  "name": "scrim-s06iu6c",
-  "description": "https://scrimba.com/frontend-path-c0j/~03ec",
-  "scripts": {
-    "watch": "webpack -w",
-    "build": "webpack",
-    "start": "http-server -c-1"
-  },
-  "dependencies": {
-    "webpack": "^2.0"
-  },
-  "devDependencies": {
-    "babel-core": "^6.0",
-    "babel-loader": "^7.0",
-    "babel-preset-env": "*",
-    "babel-preset-react": "*",
-    "http-server": "^14.1.1",
-    "live-server": "^1.2.2"
-  },
-  "version": "1.0.0",
+  "name": "blackjack-studio",
+  "version": "2.0.0",
+  "description": "Portfolio-grade blackjack simulator built with vanilla HTML, CSS, and JavaScript.",
   "main": "index.js",
-  "keywords": [],
+  "scripts": {
+    "start": "http-server -c-1 .",
+    "test": "node --test tests/*.test.js && node --check index.js",
+    "test:watch": "node --test --watch tests/*.test.js",
+    "build": "echo \"Static project: no build step required.\""
+  },
+  "keywords": [
+    "blackjack",
+    "javascript",
+    "portfolio",
+    "web-game"
+  ],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
 }

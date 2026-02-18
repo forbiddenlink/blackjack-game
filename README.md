@@ -1,88 +1,97 @@
-# Blackjack Game
+# Blackjack Studio
 
-A modern, interactive Blackjack game built with HTML, CSS, and JavaScript. Play against the dealer, manage your bets, and try your luck at hitting 21!
+A portfolio-grade blackjack simulator built with vanilla HTML, CSS, and JavaScript.
 
-## Features
+![Blackjack Studio hero screenshot placeholder](https://dummyimage.com/1200x630/08131f/e8f0f7&text=Blackjack+Studio)
 
-- 🎮 Interactive gameplay with a clean, modern interface
-- 💰 Betting system with multiple chip denominations ($5, $25, $100, $500)
-- 👤 Customizable player names
-- 🎲 Standard Blackjack rules and payouts
-- 🎯 Multiple game actions: Hit, Stand, Double Down
-- 💫 Real-time game statistics and balance tracking
+## Why this project is portfolio-ready
 
-## Getting Started
+- Clear product framing and visual identity (casino-inspired interface, responsive layout, polished typography).
+- Stateful game engine with multi-deck shoe behavior and reliable hand resolution logic.
+- Advanced gameplay support: split, double down, insurance, and surrender.
+- Daily Challenge mode with deterministic seeded shoe for comparable runs.
+- Strategy-hint mode that can be toggled on/off.
+- Persistent data layer using `localStorage` for profile, stats, achievements, and history.
+- Accessibility-aware interactions: semantic regions, keyboard shortcuts, live status updates, and reduced-motion support.
+- Modular architecture with a reusable core logic layer and automated test coverage.
 
-### Prerequisites
+## Feature set
 
-- Node.js (version 12 or higher recommended)
-- npm (comes with Node.js)
+### Gameplay
+- 6-deck shoe with reshuffle behavior.
+- Deterministic Daily Challenge shoe keyed by local date.
+- Standard hand actions: Hit, Stand, Double, Split, Insurance, Surrender.
+- Split up to 4 hands.
+- Split aces follow one-card rule.
+- Dealer stands on all 17 values.
+- Blackjack payout 3:2.
 
-### Installation
+### Analytics + progression
+- Session-independent stats and bankroll persistence.
+- Win/loss/push tracking, streak tracking, and net profit calculations.
+- Achievement system with unlock notifications.
+- Recent-hands feed with per-round net result.
+- Shareable Daily Challenge result summary.
 
-1. Clone the repository:
-```bash
-git clone git@github.com:forbiddenlink/blackjack-game.git
-cd blackjack-game
+### UX quality
+- Keyboard support: `H`, `S`, `D`, `P`, `I`, `R`.
+- Quick bet controls (`Undo`, `Clear`) and chip-based betting UX.
+- Sound toggle and hint toggle.
+- Mobile and desktop optimized layout.
+
+## Tech stack
+
+- HTML5
+- CSS3
+- Vanilla JavaScript (ES6+)
+- `http-server` for local serving
+- Node built-in test runner (`node:test`) for deterministic unit tests
+
+## Project structure
+
+```text
+/Volumes/LizsDisk/blackjack-game
+├── blackjack-core.js
+├── .github/workflows/ci.yml
+├── index.html
+├── index.css
+├── index.js
+├── tests/blackjack-core.test.js
+├── package.json
+├── package-lock.json
+└── README.md
 ```
 
-2. Install dependencies:
+## Run locally
+
 ```bash
 npm install
-```
-
-3. Start the development server:
-```bash
 npm start
 ```
 
-4. Open your browser and navigate to `http://localhost:8080`
+Open `http://127.0.0.1:8080`.
 
-## How to Play
+## Validate locally
 
-1. Enter your name and click "SET NAME"
-2. Select your bet amount using the chip denominations
-3. Click "START GAME" to begin
-4. Choose your action:
-   - HIT: Take another card
-   - STAND: Keep your current hand
-   - DOUBLE: Double your bet and receive one more card
-
-## Game Rules
-
-- Get as close to 21 as possible without going over
-- Face cards (J, Q, K) are worth 10
-- Aces are worth 1 or 11
-- Blackjack (Ace + 10-value card) pays 3:2
-- Dealer must hit on 16 or less and stand on 17 or more
-- Players can double down on their initial hand
-
-## Development
-
-### Project Structure
-```
-blackjack-game/
-  ├── index.html      # Main HTML file
-  ├── index.css       # Styles
-  ├── index.js        # Game logic
-  ├── package.json    # Dependencies and scripts
-  └── README.md       # Documentation
+```bash
+npm test
 ```
 
-### Available Scripts
+## Quality gates
 
-- `npm start`: Starts the development server
-- `npm run build`: Builds the project
-- `npm run watch`: Watches for changes and rebuilds
+- Core logic tests: `tests/blackjack-core.test.js`
+- Browser script syntax check: `node --check index.js`
+- CI pipeline: `.github/workflows/ci.yml` runs on pushes and pull requests
 
-## License
+## Notes for reviewers
 
-This project is licensed under the ISC License - see the LICENSE file for details.
+- Main engine and UI logic live in `/Volumes/LizsDisk/blackjack-game/index.js`.
+- Pure blackjack logic lives in `/Volumes/LizsDisk/blackjack-game/blackjack-core.js`.
+- Visual system and responsiveness live in `/Volumes/LizsDisk/blackjack-game/index.css`.
+- Accessibility and semantic document structure live in `/Volumes/LizsDisk/blackjack-game/index.html`.
 
-## Contributing
+## Next improvements (optional)
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+- Add deterministic test coverage for full round-state transitions in `index.js`.
+- Add smoke-style browser tests (Playwright) for key UI flows.
+- Add optional card-count trainer mode.

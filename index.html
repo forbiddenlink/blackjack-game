@@ -1,80 +1,185 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <title>Blackjack Game</title>
-        <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA/4QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAERERERERERERAAAAAAAAERAQAAAAAAEBEAEAAAAAEAEQABAAAAEAEQAAEAAAAQARAAEAAAABAREAARAAAAEAEQABEAAAAQARAAEQAAABEAEAAREAAAEQAAABEQAAEQAAAAERAAEQAAAAARERAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA">
-        <link rel="stylesheet" href="index.css">
-        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-        <script src="index.js" defer></script>
-    </head>
-    <body>
-        <div class="game-container">
-            <div class="game-header">
-                <h1>Blackjack</h1>
-                <div class="player-info">
-                    <div class="player-name-input">
-                        <input type="text" id="player-name-input" placeholder="Enter your name">
-                        <button id="set-name-btn">SET NAME</button>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Blackjack Studio: a portfolio-ready blackjack simulator built with vanilla HTML, CSS, and JavaScript.">
+    <meta name="theme-color" content="#08131f">
+    <title>Blackjack Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+    <script src="blackjack-core.js" defer></script>
+    <script src="index.js" defer></script>
+</head>
+<body>
+    <div class="bg-orb orb-one" aria-hidden="true"></div>
+    <div class="bg-orb orb-two" aria-hidden="true"></div>
+
+    <header class="site-header">
+        <div>
+            <p class="eyebrow">Portfolio Build</p>
+            <h1>Blackjack Studio</h1>
+            <p class="subhead">A strategic blackjack simulator with modern UX, analytics, and accessible interactions.</p>
+        </div>
+        <form id="player-form" class="player-form" autocomplete="off">
+            <label for="player-name-input">Player name</label>
+            <div class="player-form-row">
+                <input type="text" id="player-name-input" name="player-name" maxlength="24" placeholder="Enter your name">
+                <button id="set-name-btn" type="submit">Set Name</button>
+            </div>
+            <p id="player-el" class="player-bankroll">Player - Bankroll: $1000</p>
+        </form>
+    </header>
+
+    <main class="layout" id="main-content">
+        <section class="table-panel" aria-labelledby="table-title">
+            <div class="panel-heading">
+                <h2 id="table-title">Table</h2>
+                <p id="message-el" role="status" aria-live="polite">Place your bet to begin.</p>
+            </div>
+
+            <div class="hand-grid">
+                <article class="hand-block">
+                    <h3>Dealer <span id="dealer-phase" class="badge">Idle</span></h3>
+                    <div id="dealer-cards" class="cards-container" aria-label="Dealer cards"></div>
+                    <p id="dealer-sum-el" class="hand-sum">Total: --</p>
+                </article>
+
+                <article class="hand-block">
+                    <h3>Player <span id="active-hand-indicator" class="badge">Hand 1</span></h3>
+                    <div id="cards-el" class="cards-container" aria-label="Player cards"></div>
+                    <p id="sum-el" class="hand-sum">Total: --</p>
+                    <p id="hint-el" class="hint-line" aria-live="polite"></p>
+                </article>
+            </div>
+
+            <section class="betting-area" aria-label="Bet controls">
+                <div class="betting-header">
+                    <p id="current-bet" class="bet-amount">Current Bet: $0</p>
+                    <div class="betting-quick-actions">
+                        <button id="undo-bet-btn" type="button" class="secondary-btn">Undo</button>
+                        <button id="clear-bet-btn" type="button" class="secondary-btn">Clear</button>
                     </div>
-                    <p id="player-el" class="player-stats"></p>
                 </div>
-            </div>
-            
-            <div class="instructions">
-                <div class="steps">
-                    <span>1. Enter name & SET NAME</span>
-                    <span>→</span>
-                    <span>2. Select bet amount</span>
-                    <span>→</span>
-                    <span>3. START GAME</span>
+                <div class="chip-denominations" role="group" aria-label="Chip values">
+                    <button class="chip-button" type="button" data-value="5">$5</button>
+                    <button class="chip-button" type="button" data-value="25">$25</button>
+                    <button class="chip-button" type="button" data-value="100">$100</button>
+                    <button class="chip-button" type="button" data-value="500">$500</button>
                 </div>
-            </div>
-            
-            <p id="message-el">Ready to play!</p>
-            
-            <div class="hands-container">
-                <div class="dealer-area">
-                    <h2>DEALER</h2>
-                    <div id="dealer-cards" class="cards-container"></div>
-                    <p id="dealer-sum-el">Sum: 0</p>
-                </div>
-                
-                <div class="player-area">
-                    <h3>PLAYER</h3>
-                    <div id="cards-el" class="cards-container"></div>
-                    <p id="sum-el">Sum: 0</p>
-                    <p id="current-bet">Current Bet: $0</p>
-                </div>
-            </div>
+            </section>
 
-            <div class="betting-area">
-                <div class="chip-denominations">
-                    <button class="chip-button" data-value="5">$5</button>
-                    <button class="chip-button" data-value="25">$25</button>
-                    <button class="chip-button" data-value="100">$100</button>
-                    <button class="chip-button" data-value="500">$500</button>
-                </div>
-            </div>
+            <section class="game-controls" aria-label="Round actions">
+                <button id="start-btn" type="button">Deal</button>
+                <button id="hit-btn" type="button" disabled>Hit</button>
+                <button id="stand-btn" type="button" disabled>Stand</button>
+                <button id="double-btn" type="button" disabled>Double</button>
+                <button id="split-btn" type="button" disabled>Split</button>
+                <button id="insurance-btn" type="button" disabled>Insurance</button>
+                <button id="surrender-btn" type="button" disabled>Surrender</button>
+            </section>
 
-            <div class="game-controls">
-                <button id="start-btn">START GAME</button>
-                <button id="hit-btn" disabled>HIT</button>
-                <button id="stand-btn" disabled>STAND</button>
-                <button id="double-btn" disabled>DOUBLE</button>
+            <p class="shortcut-help">Shortcuts: <kbd>H</kbd> hit, <kbd>S</kbd> stand, <kbd>D</kbd> double, <kbd>P</kbd> split, <kbd>I</kbd> insurance, <kbd>R</kbd> deal, <kbd>C</kbd> challenge toggle.</p>
+        </section>
+
+        <aside class="side-panel" aria-label="Game context">
+            <section class="snapshot-panel">
+                <h2>Round Snapshot</h2>
+                <div class="snapshot-grid">
+                    <div>
+                        <p class="snapshot-label">Total Hands</p>
+                        <p class="snapshot-value" id="stat-total-hands">0</p>
+                    </div>
+                    <div>
+                        <p class="snapshot-label">Win Rate</p>
+                        <p class="snapshot-value" id="stat-win-rate">0%</p>
+                    </div>
+                    <div>
+                        <p class="snapshot-label">Total Won</p>
+                        <p class="snapshot-value" id="stat-total-won">$0</p>
+                    </div>
+                    <div>
+                        <p class="snapshot-label">Best Streak</p>
+                        <p class="snapshot-value" id="stat-best-streak">0</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="settings-panel">
+                <h2>Settings</h2>
+                <label class="toggle-row" for="sound-toggle">
+                    <input id="sound-toggle" type="checkbox" checked>
+                    <span>Sound Effects</span>
+                </label>
+                <label class="toggle-row" for="hints-toggle">
+                    <input id="hints-toggle" type="checkbox" checked>
+                    <span>Basic Strategy Hints</span>
+                </label>
+                <p class="small-note">Hints are optional and based on common blackjack strategy patterns.</p>
+            </section>
+
+            <section id="challenge-panel" class="challenge-panel" aria-labelledby="challenge-title">
+                <h2 id="challenge-title">Daily Challenge</h2>
+                <p id="challenge-seed" class="challenge-seed">Seed: --</p>
+                <div class="challenge-metrics">
+                    <div class="stats-row"><span>Status</span><span id="challenge-status">Inactive</span></div>
+                    <div class="stats-row"><span>Rounds</span><span id="challenge-rounds">0</span></div>
+                    <div class="stats-row"><span>Net</span><span id="challenge-net">$0</span></div>
+                </div>
+                <div class="challenge-actions">
+                    <button id="challenge-toggle-btn" type="button">Start Daily Challenge</button>
+                    <button id="challenge-share-btn" type="button" class="secondary-btn" disabled>Share Score</button>
+                </div>
+                <p class="small-note">Challenge mode uses a deterministic daily shoe so runs are comparable.</p>
+            </section>
+
+            <section class="rules-panel" aria-labelledby="rules-title">
+                <h2 id="rules-title">Table Rules</h2>
+                <ul>
+                    <li>Blackjack pays 3:2.</li>
+                    <li>Dealer stands on all 17 values.</li>
+                    <li>Insurance is available vs dealer Ace.</li>
+                    <li>Double down on first two cards only.</li>
+                    <li>Split pairs up to 4 hands.</li>
+                    <li>Split aces receive one card each.</li>
+                </ul>
+            </section>
+        </aside>
+    </main>
+
+    <section class="stats-dashboard" aria-labelledby="stats-title">
+        <h2 id="stats-title">Performance Stats</h2>
+        <div class="detailed-stats">
+            <div class="stats-section">
+                <h3>Results</h3>
+                <div class="stats-row"><span>Wins</span><span id="stat-wins">0</span></div>
+                <div class="stats-row"><span>Losses</span><span id="stat-losses">0</span></div>
+                <div class="stats-row"><span>Pushes</span><span id="stat-pushes">0</span></div>
+                <div class="stats-row"><span>Blackjacks</span><span id="stat-blackjacks">0</span></div>
+                <div class="stats-row"><span>Busts</span><span id="stat-busts">0</span></div>
+            </div>
+            <div class="stats-section">
+                <h3>Advanced</h3>
+                <div class="stats-row"><span>Current Streak</span><span id="stat-current-streak">0</span></div>
+                <div class="stats-row"><span>Double Down Wins</span><span id="stat-double-wins">0</span></div>
+                <div class="stats-row"><span>Split Wins</span><span id="stat-split-wins">0</span></div>
+                <div class="stats-row"><span>Total Wagered</span><span id="stat-total-wagered">$0</span></div>
+                <div class="stats-row"><span>Net Profit</span><span id="stat-net-profit">$0</span></div>
             </div>
         </div>
+    </section>
 
-        <div class="rules-section">
-            <h2>Blackjack Rules</h2>
-            <ul>
-                <li>Get as close to 21 as possible without going over</li>
-                <li>Face cards are worth 10, Aces are worth 1 or 11</li>
-                <li>Blackjack (Ace + 10) pays 3:2</li>
-                <li>Dealer must hit on 16 or less, stand on 17 or more</li>
-                <li>Double down: Double your bet and get one more card</li>
-                <li>Surrender: Give up half your bet and end the hand</li>
-            </ul>
-            <button id="got-it-btn">GOT IT!</button>
-        </div>
-    </body>
+    <section class="game-history" aria-labelledby="history-title">
+        <h2 id="history-title">Recent Hands</h2>
+        <div id="history-container" aria-live="polite"></div>
+        <button id="clear-history-btn" type="button" class="secondary-btn">Clear History</button>
+    </section>
+
+    <section class="achievements-section" id="achievements-section" aria-labelledby="achievements-title">
+        <h2 id="achievements-title">Achievements</h2>
+        <div id="achievements-grid" class="achievements-grid"></div>
+    </section>
+</body>
 </html>
