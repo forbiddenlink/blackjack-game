@@ -1,5 +1,5 @@
 {
-  "name": "blackjack-studio",
+  "name": "blackjack-game",
   "version": "2.0.0",
   "description": "Portfolio-grade blackjack simulator built with vanilla HTML, CSS, and JavaScript.",
   "main": "index.js",
