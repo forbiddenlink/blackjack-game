@@ -8,13 +8,18 @@ yarn-error.log
 .env
 .env.local
 .env.*.local
-
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-
 # OS
 .DS_Store
 Thumbs.db 
+# Build output
+.next/
+dist/
+build/
+out/
+# Vercel
+.vercel
