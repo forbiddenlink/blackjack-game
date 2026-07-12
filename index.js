@@ -1261,40 +1261,37 @@ function ensureAudioContext() {
     }
 }
 
+const SOUND_FILES = {
+    chip: "sounds/chip.mp3",
+    deal: "sounds/deal.mp3",
+    win: "sounds/win.mp3",
+    lose: "sounds/lose.mp3"
+};
+const soundCache = {};
+
 function playSound(type) {
     if (!player.settings.sound) {
         return;
     }
 
-    ensureAudioContext();
-    if (!audioContext) {
+    const src = SOUND_FILES[type];
+    if (!src) {
         return;
     }
 
-    const now = audioContext.currentTime;
+    let clip = soundCache[type];
+    if (!clip) {
+        clip = new Audio(src);
+        soundCache[type] = clip;
+    }
 
-    const tone = (frequency, duration, gain, offset = 0) => {
-        const osc = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        osc.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        osc.frequency.value = frequency;
-        gainNode.gain.setValueAtTime(gain, now + offset);
-        gainNode.gain.exponentialRampToValueAtTime(0.0001, now + offset + duration);
-        osc.start(now + offset);
-        osc.stop(now + offset + duration);
-    };
-
-    if (type === "deal") {
-        tone(360, 0.08, 0.08);
-    } else if (type === "chip") {
-        tone(520, 0.09, 0.07);
-    } else if (type === "win") {
-        tone(523, 0.13, 0.08, 0);
-        tone(659, 0.13, 0.08, 0.08);
-        tone(784, 0.15, 0.08, 0.16);
-    } else if (type === "lose") {
-        tone(220, 0.3, 0.08);
+    try {
+        clip.currentTime = 0;
+        clip.play().catch(() => {
+            // Ignore autoplay restrictions.
+        });
+    } catch (err) {
+        // Ignore playback errors in restrictive environments.
     }
 }
 
