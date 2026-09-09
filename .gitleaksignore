@@ -1,0 +1,4 @@
+# PostHog project API key. phc_ tokens are public client-side identifiers by design
+# and must ship in the browser bundle; this is a static site with no build step to
+# inject one. Not a secret. https://posthog.com/docs/privacy/data-collection
+posthog.js:generic-api-key:1

@@ -5,9 +5,12 @@
   "main": "index.js",
   "scripts": {
     "start": "http-server -c-1 .",
-    "test": "node --test tests/*.test.js && node --check index.js",
+    "test": "node --test tests/*.test.js && node --check blackjack-core.js && node --check index.js && node --check posthog.js",
     "test:watch": "node --test --watch tests/*.test.js",
     "build": "echo \"Static project: no build step required.\"",
+    "check": "pnpm biome:check && pnpm test && pnpm build",
+    "security": "pnpm audit --audit-level high",
+    "audit": "pnpm audit --audit-level high",
     "biome:check": "biome check .",
     "biome:fix": "biome check . --write",
     "biome:format": "biome format . --write"
@@ -27,8 +30,8 @@
   "packageManager": "pnpm@10.34.5",
   "pnpm": {
     "overrides": {
-      "follow-redirects": ">=1.16.0",
-      "qs": ">=6.15.2"
+      "follow-redirects": ">=1.16.0 <2",
+      "qs": ">=6.15.3 <7"
     }
   }
 }
