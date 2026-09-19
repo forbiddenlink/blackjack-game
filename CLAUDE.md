@@ -9,8 +9,7 @@ no framework, no build step.
 - `http-server` for local serving
 - Node's built-in test runner (`node:test`), not a third-party test framework
 - Biome for lint/format
-- Package manager: pnpm (`pnpm-lock.yaml`, `packageManager: pnpm@10.34.5`); the README's
-  quick-start section names the wrong one
+- Package manager: pnpm (`pnpm-lock.yaml`, `packageManager: pnpm@10.34.5`)
 
 ## Commands
 
@@ -33,7 +32,6 @@ no framework, no build step.
 - `posthog.js` - PostHog analytics init (client-side project token, not a secret)
 - `sounds/` - game sound effects
 - `tests/blackjack-core.test.js` - unit tests for the core logic
-- `docs/` - project docs
 - `.github/workflows/ci.yml` - runs `pnpm install --frozen-lockfile` then `pnpm test` on
   push/PR
 
@@ -55,5 +53,3 @@ has no dedicated test coverage beyond the syntax check in `pnpm test`.
 
 - No environment variables or `.env` files; the PostHog token in `posthog.js` is a public
   client-side project key, not a secret to rotate.
-- README's project-structure section and quick-start instructions reference the wrong
-  package manager and its lockfile name; the real lockfile is `pnpm-lock.yaml`.
