@@ -2,8 +2,6 @@
 
 A portfolio-grade blackjack simulator built with vanilla HTML, CSS, and JavaScript.
 
-![Blackjack Studio hero screenshot placeholder](https://dummyimage.com/1200x630/08131f/e8f0f7&text=Blackjack+Studio)
-
 ## Why this project is portfolio-ready
 
 - Clear product framing and visual identity (casino-inspired interface, responsive layout, polished typography).
@@ -50,7 +48,7 @@ A portfolio-grade blackjack simulator built with vanilla HTML, CSS, and JavaScri
 ## Project structure
 
 ```text
-/Volumes/LizsDisk/blackjack-game
+blackjack-game/
 ├── blackjack-core.js
 ├── .github/workflows/ci.yml
 ├── index.html
@@ -58,15 +56,15 @@ A portfolio-grade blackjack simulator built with vanilla HTML, CSS, and JavaScri
 ├── index.js
 ├── tests/blackjack-core.test.js
 ├── package.json
-├── package-lock.json
+├── pnpm-lock.yaml
 └── README.md
 ```
 
 ## Run locally
 
 ```bash
-npm install
-npm start
+pnpm install
+pnpm start
 ```
 
 Open `http://127.0.0.1:8080`.
@@ -74,7 +72,7 @@ Open `http://127.0.0.1:8080`.
 ## Validate locally
 
 ```bash
-npm test
+pnpm test
 ```
 
 ## Quality gates
@@ -85,10 +83,10 @@ npm test
 
 ## Notes for reviewers
 
-- Main engine and UI logic live in `/Volumes/LizsDisk/blackjack-game/index.js`.
-- Pure blackjack logic lives in `/Volumes/LizsDisk/blackjack-game/blackjack-core.js`.
-- Visual system and responsiveness live in `/Volumes/LizsDisk/blackjack-game/index.css`.
-- Accessibility and semantic document structure live in `/Volumes/LizsDisk/blackjack-game/index.html`.
+- Main engine and UI logic live in `index.js`.
+- Pure blackjack logic lives in `blackjack-core.js`.
+- Visual system and responsiveness live in `index.css`.
+- Accessibility and semantic document structure live in `index.html`.
 
 ## Next improvements (optional)
 
