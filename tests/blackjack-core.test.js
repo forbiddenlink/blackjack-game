@@ -142,3 +142,71 @@ test('resolveHandOutcome returns expected result across scenarios', () => {
   )
   assert.equal(surrendered, 'surrender')
 })
+
+test('resolveHandOutcome gives a dealer natural precedence over any non-natural 21', () => {
+  const dealerNatural = [
+    { rank: 'A', suit: '♠' },
+    { rank: 'K', suit: '♦' },
+  ]
+  const threeCardTwentyOne = [
+    { rank: '7', suit: '♦' },
+    { rank: '7', suit: '♥' },
+    { rank: '7', suit: '♣' },
+  ]
+  const splitTwentyOne = [
+    { rank: 'A', suit: '♦' },
+    { rank: 'K', suit: '♥' },
+  ]
+  const playerNatural = [
+    { rank: 'A', suit: '♥' },
+    { rank: 'Q', suit: '♣' },
+  ]
+
+  assert.equal(Core.resolveHandOutcome(threeCardTwentyOne, dealerNatural), 'lose')
+  assert.equal(Core.resolveHandOutcome(splitTwentyOne, dealerNatural, { splitOrigin: true }), 'lose')
+  assert.equal(Core.resolveHandOutcome(playerNatural, dealerNatural), 'push')
+})
+
+test('resolveHandOutcome pays a player natural 3:2 even against a dealer 3-card 21', () => {
+  const dealerThreeCardTwentyOne = [
+    { rank: '7', suit: '♠' },
+    { rank: '7', suit: '♦' },
+    { rank: '7', suit: '♣' },
+  ]
+  const playerNatural = [
+    { rank: 'A', suit: '♥' },
+    { rank: 'K', suit: '♣' },
+  ]
+
+  assert.equal(Core.resolveHandOutcome(playerNatural, dealerThreeCardTwentyOne), 'blackjack')
+  assert.equal(
+    Core.resolveHandOutcome(playerNatural, dealerThreeCardTwentyOne, { splitOrigin: true }),
+    'push'
+  )
+})
+
+test('resolveHandOutcome covers bust, dealer bust, and plain comparisons', () => {
+  const bust = [
+    { rank: 'K', suit: '♠' },
+    { rank: 'Q', suit: '♦' },
+    { rank: '5', suit: '♣' },
+  ]
+  const dealerBust = [
+    { rank: 'K', suit: '♠' },
+    { rank: '6', suit: '♦' },
+    { rank: '9', suit: '♣' },
+  ]
+  const eighteen = [
+    { rank: '10', suit: '♠' },
+    { rank: '8', suit: '♦' },
+  ]
+  const seventeen = [
+    { rank: '10', suit: '♥' },
+    { rank: '7', suit: '♦' },
+  ]
+
+  assert.equal(Core.resolveHandOutcome(bust, dealerBust), 'bust')
+  assert.equal(Core.resolveHandOutcome(eighteen, dealerBust), 'win')
+  assert.equal(Core.resolveHandOutcome(seventeen, eighteen), 'lose')
+  assert.equal(Core.resolveHandOutcome(eighteen, seventeen), 'win')
+})

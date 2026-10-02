@@ -122,14 +122,17 @@
     const dealerValue = getHandValue(dealerCards)
 
     if (playerValue.isBust) return 'bust'
-    if (dealerValue.isBust) {
-      return playerValue.isBlackjack && !splitOrigin ? 'blackjack' : 'win'
-    }
 
+    // A natural is a two-card 21 that did not come from a split. A dealer natural beats any
+    // non-natural 21, and a player natural beats a dealer 21 made with three or more cards.
+    const playerNatural = playerValue.isBlackjack && !splitOrigin
+    const dealerNatural = dealerValue.isBlackjack
+    if (dealerNatural) return playerNatural ? 'push' : 'lose'
+    if (playerNatural) return 'blackjack'
+
+    if (dealerValue.isBust) return 'win'
     if (dealerValue.total > playerValue.total) return 'lose'
-    if (dealerValue.total < playerValue.total) {
-      return playerValue.isBlackjack && !splitOrigin ? 'blackjack' : 'win'
-    }
+    if (dealerValue.total < playerValue.total) return 'win'
 
     return 'push'
   }
