@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "http-server -c-1 .",
-    "test": "node --test tests/*.test.js && node --check blackjack-core.js && node --check index.js && node --check posthog.js",
+    "test": "node --test tests/*.test.js && node --check blackjack-core.js && node --check cards.js && node --check index.js && node --check posthog.js",
     "test:watch": "node --test --watch tests/*.test.js",
     "build": "echo \"Static project: no build step required.\"",
     "check": "pnpm biome:check && pnpm test && pnpm build",

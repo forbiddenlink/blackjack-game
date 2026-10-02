@@ -11,10 +11,24 @@
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="index.css">
     <script src="blackjack-core.js" defer></script>
+    <script src="cards.js" defer></script>
     <script src="index.js" defer></script>
     <script src="posthog.js" defer></script>
 </head>
 <body>
+    <svg class="svg-sprite" width="0" height="0" aria-hidden="true" focusable="false">
+        <defs>
+            <symbol id="suit-s" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C9.5 6.5 3 9.6 3 14.4a4.6 4.6 0 0 0 7.6 3.4c-.2 1.8-.9 3.1-2.3 4.2h7.4c-1.4-1.1-2.1-2.4-2.3-4.2A4.6 4.6 0 0 0 21 14.4C21 9.6 14.5 6.5 12 2z"/></symbol>
+            <symbol id="suit-h" viewBox="0 0 24 24"><path fill="currentColor" d="M12 21.35 10.55 20.03C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54z"/></symbol>
+            <symbol id="suit-d" viewBox="0 0 24 24"><path fill="currentColor" d="M12 1.5 20.5 12 12 22.5 3.5 12z"/></symbol>
+            <symbol id="suit-c" viewBox="0 0 24 24"><path fill="currentColor" d="M12 1.8a4.4 4.4 0 0 0-2.9 7.7 4.9 4.9 0 1 0 1.5 8.4c-.2 1.7-.9 3-2.3 4.3h7.4c-1.4-1.3-2.1-2.6-2.3-4.3a4.9 4.9 0 1 0 1.5-8.4A4.4 4.4 0 0 0 12 1.8z"/></symbol>
+            <pattern id="card-back-pattern" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <rect width="8" height="8" fill="#27527d"/>
+                <rect width="4" height="4" fill="#33699f"/>
+                <rect x="4" y="4" width="4" height="4" fill="#33699f"/>
+            </pattern>
+        </defs>
+    </svg>
     <div class="bg-orb orb-one" aria-hidden="true"></div>
     <div class="bg-orb orb-two" aria-hidden="true"></div>
 
@@ -41,24 +55,38 @@
                 <p id="message-el" role="status" aria-live="polite">Place your bet to begin.</p>
             </div>
 
-            <div class="hand-grid">
-                <article class="hand-block">
+            <div class="felt" id="felt">
+                <div class="shoe" id="shoe-el" role="img" aria-label="Shoe">
+                    <span class="shoe-box" aria-hidden="true"></span>
+                    <span class="shoe-count" id="shoe-count" aria-hidden="true">312</span>
+                    <span class="shoe-meter" aria-hidden="true"><i id="shoe-meter-fill"></i></span>
+                </div>
+
+                <article class="hand-block dealer-block">
                     <h3>Dealer <span id="dealer-phase" class="badge">Idle</span></h3>
                     <ul id="dealer-cards" class="cards-container" aria-label="Dealer cards"></ul>
                     <p id="dealer-sum-el" class="hand-sum">Total: --</p>
                 </article>
 
-                <article class="hand-block">
+                <svg class="felt-arc" viewBox="0 0 600 64" aria-hidden="true" focusable="false">
+                    <path id="felt-arc-top" d="M 40 14 Q 300 58 560 14" fill="none"/>
+                    <text><textPath href="#felt-arc-top" startOffset="50%" text-anchor="middle">BLACKJACK PAYS 3 TO 2</textPath></text>
+                    <text x="300" y="58" text-anchor="middle" class="felt-arc-small">DEALER STANDS ON ALL 17 · INSURANCE PAYS 2 TO 1</text>
+                </svg>
+
+                <article class="hand-block player-block">
                     <h3>Player <span id="active-hand-indicator" class="badge">Hand 1</span></h3>
-                    <ul id="cards-el" class="cards-container" aria-label="Player cards"></ul>
-                    <p id="sum-el" class="hand-sum">Total: --</p>
+                    <ul id="player-hands" class="player-hands" aria-label="Player hands" data-count="0"></ul>
                     <p id="hint-el" class="hint-line" aria-live="polite"></p>
                 </article>
             </div>
 
             <section class="betting-area" aria-label="Bet controls">
                 <div class="betting-header">
-                    <p id="current-bet" class="bet-amount">Current Bet: $0</p>
+                    <div class="bet-readout">
+                        <div id="bet-stack" class="bet-stack" aria-hidden="true"></div>
+                        <p id="current-bet" class="bet-amount">Current Bet: $0</p>
+                    </div>
                     <div class="betting-quick-actions">
                         <button id="undo-bet-btn" type="button" class="secondary-btn">Undo</button>
                         <button id="clear-bet-btn" type="button" class="secondary-btn">Clear</button>
@@ -134,7 +162,7 @@
                     <button id="challenge-toggle-btn" type="button">Start Daily Challenge</button>
                     <button id="challenge-share-btn" type="button" class="secondary-btn" disabled>Share Score</button>
                 </div>
-                <p class="small-note">Challenge mode uses a deterministic daily shoe so runs are comparable.</p>
+                <p class="small-note">One attempt per day, 20 rounds. The shoe stays sealed until you start, and ending early still uses the day.</p>
             </section>
 
             <section class="rules-panel" aria-labelledby="rules-title">
