@@ -1,6 +1,9 @@
 const STORAGE_KEY = 'blackjackStudioState.v2'
 const SHOE_DECKS = 6
 const MAX_SPLIT_HANDS = 4
+const SHOE_SIZE = SHOE_DECKS * 52
+const RESHUFFLE_THRESHOLD = 52
+const DAILY_ROUND_LIMIT = window.BlackjackCore?.DAILY_ROUND_LIMIT ?? 20
 const Core = window.BlackjackCore
 if (!Core) {
   throw new Error('BlackjackCore is missing. Ensure blackjack-core.js loads before index.js.')
@@ -113,6 +116,7 @@ function createEmptyRound() {
     insuranceBet: 0,
     hasTakenAction: false,
     chipsBeforeRound: null,
+    settled: false,
   }
 }
 
@@ -143,6 +147,7 @@ function createDefaultChallenge() {
     roundsPlayed: 0,
     startingChips: 0,
     reshuffles: 0,
+    drawn: 0,
   }
 }
 
@@ -161,6 +166,11 @@ let history = []
 let shoe = []
 let round = createEmptyRound()
 let challenge = createDefaultChallenge()
+let dailyLog = {}
+let savedRound = null
+let savedShoe = null
+let suppressDealAnimation = false
+let resumeNotice = ''
 let resetTimer = null
 let audioContext = null
 
@@ -170,10 +180,23 @@ document.addEventListener('DOMContentLoaded', () => {
   cacheElements()
   loadGame()
   syncChallengeWithToday()
-  buildShoe(true)
+  restoreShoe()
   bindEvents()
+  const resumed = resumeSavedRound()
+  suppressDealAnimation = true
   renderAll()
-  setMessage('Welcome to Blackjack Studio. Place your bet to begin.')
+  suppressDealAnimation = false
+
+  if (resumed === 'dealer-turn') {
+    setMessage('Round resumed after reload. Dealer is playing...')
+    startDealerTurn()
+  } else if (resumed === 'player-turn') {
+    setMessage('Round resumed after reload. Your move.')
+  } else if (!resumeNotice) {
+    setMessage('Welcome to Blackjack Studio. Place your bet to begin.')
+  } else {
+    setMessage(resumeNotice)
+  }
 })
 
 function cacheElements() {
@@ -186,9 +209,13 @@ function cacheElements() {
     'dealer-phase',
     'dealer-cards',
     'dealer-sum-el',
-    'cards-el',
-    'sum-el',
+    'player-hands',
     'hint-el',
+    'bet-stack',
+    'felt',
+    'shoe-el',
+    'shoe-count',
+    'shoe-meter-fill',
     'active-hand-indicator',
     'current-bet',
     'undo-bet-btn',
@@ -324,34 +351,85 @@ function toggleDailyChallenge() {
     return
   }
 
+  const today = getCurrentLocalDateKey()
+
   if (!challenge.active) {
+    if (Core.hasDailyAttempt(dailyLog, today)) {
+      setMessage("You already played today's Daily Challenge. A new shoe opens tomorrow.")
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Start today's Daily Challenge? You get one attempt per day: ${DAILY_ROUND_LIMIT} rounds, and ending early still uses the day.`
+    )
+    if (!confirmed) {
+      return
+    }
+
+    dailyLog = Core.startDailyAttempt(dailyLog, today)
     challenge = {
       active: true,
-      seedDate: getCurrentLocalDateKey(),
+      seedDate: today,
       roundsPlayed: 0,
       startingChips: player.chips,
       reshuffles: 0,
+      drawn: 0,
     }
     buildShoe(true)
-    setMessage(`Daily Challenge started for ${challenge.seedDate}.`)
+    setMessage(`Daily Challenge started: ${DAILY_ROUND_LIMIT} rounds on today's shoe.`)
   } else {
-    challenge = createDefaultChallenge()
-    buildShoe(true)
-    setMessage('Daily Challenge ended. Standard shoe restored.')
+    const confirmed = window.confirm(
+      "End today's Daily Challenge? Your result is recorded and you cannot restart it until tomorrow."
+    )
+    if (!confirmed) {
+      return
+    }
+
+    completeDailyChallenge('ended')
+    setMessage('Daily Challenge ended. Your result is saved for today.')
   }
 
   renderAll()
   saveGame()
 }
 
+function completeDailyChallenge(endedBy) {
+  dailyLog = Core.finishDailyAttempt(dailyLog, challenge.seedDate, {
+    rounds: challenge.roundsPlayed,
+    net: player.chips - challenge.startingChips,
+    bankroll: player.chips,
+    endedBy,
+  })
+  challenge = createDefaultChallenge()
+  buildShoe(true)
+}
+
+function getDailyResultSummary() {
+  const today = getCurrentLocalDateKey()
+  const record = dailyLog[today]
+  if (challenge.active) {
+    return {
+      date: challenge.seedDate,
+      rounds: challenge.roundsPlayed,
+      net: player.chips - challenge.startingChips,
+      bankroll: player.chips,
+      live: true,
+    }
+  }
+  if (record?.status === 'complete') {
+    return { date: today, ...record, live: false }
+  }
+  return null
+}
+
 async function shareDailyChallengeResult() {
-  if (!challenge.active) {
-    setMessage('Start Daily Challenge to share a score.')
+  const result = getDailyResultSummary()
+  if (!result || result.rounds === 0) {
+    setMessage('Play at least one Daily Challenge round to share a score.')
     return
   }
 
-  const net = player.chips - challenge.startingChips
-  const summary = `Blackjack Studio Daily Challenge ${challenge.seedDate}: ${challenge.roundsPlayed} rounds, bankroll ${formatCurrency(player.chips)}, net ${net >= 0 ? '+' : ''}${formatCurrency(net)}.`
+  const summary = `Blackjack Studio Daily Challenge ${result.date}: ${result.rounds} rounds, bankroll ${formatCurrency(result.bankroll)}, net ${result.net >= 0 ? '+' : ''}${formatCurrency(result.net)}.`
 
   try {
     if (navigator.clipboard?.writeText) {
@@ -368,7 +446,8 @@ async function shareDailyChallengeResult() {
 function syncChallengeWithToday() {
   const today = getCurrentLocalDateKey()
   if (challenge.active && challenge.seedDate !== today) {
-    challenge = createDefaultChallenge()
+    // An attempt left open past midnight is closed out on its own date, never reopened.
+    completeDailyChallenge('expired')
   }
 
   if (
@@ -449,6 +528,12 @@ function startRound() {
 
   clearResetTimer()
 
+  // Reshuffle between rounds at the cut card, never while cards are on the table.
+  const reshuffled = shoe.length < RESHUFFLE_THRESHOLD
+  if (reshuffled) {
+    buildShoe(true)
+  }
+
   round.chipsBeforeRound = player.chips
   player.chips -= round.bet
   stats.totalWagered += round.bet
@@ -457,6 +542,7 @@ function startRound() {
   round.dealerHand = [drawCard(), drawCard()]
   round.activeHandIndex = 0
   round.phase = 'player-turn'
+  round.settled = false
   round.canInsurance = round.dealerHand[0].rank === 'A'
   round.insuranceBet = 0
   round.hasTakenAction = false
@@ -485,13 +571,19 @@ function startRound() {
     return
   }
 
+  const prefix = reshuffled
+    ? challenge.active
+      ? 'Challenge shoe reshuffled. '
+      : 'Shoe reshuffled. '
+    : ''
   if (round.canInsurance) {
-    setMessage('Dealer shows an Ace. Insurance is available.')
+    setMessage(`${prefix}Dealer shows an Ace. Insurance is available.`)
   } else {
-    setMessage('Hit, stand, split, or double down.')
+    setMessage(`${prefix}Hit, stand, split, or double down.`)
   }
 
   renderAll()
+  saveGame()
 }
 
 function hit() {
@@ -530,6 +622,7 @@ function hit() {
   }
 
   renderAll()
+  saveGame()
 }
 
 function stand() {
@@ -552,6 +645,7 @@ function stand() {
   setMessage(`Standing on hand ${round.activeHandIndex + 1}.`)
   moveToNextHandOrDealer()
   renderAll()
+  saveGame()
 }
 
 function doubleDown() {
@@ -581,6 +675,7 @@ function doubleDown() {
   setMessage(`Doubled down on hand ${round.activeHandIndex + 1}.`)
   moveToNextHandOrDealer()
   renderAll()
+  saveGame()
 }
 
 function split() {
@@ -638,6 +733,7 @@ function split() {
   }
 
   renderAll()
+  saveGame()
 }
 
 function takeInsurance() {
@@ -733,13 +829,20 @@ function startDealerTurn() {
   round.phase = 'dealer-turn'
   renderAll()
   setMessage('Dealer is playing...')
+  saveGame()
 
   const step = () => {
+    if (round.phase !== 'dealer-turn') {
+      return
+    }
+
     const dealerValue = getHandValue(round.dealerHand)
     if (dealerValue.total < DEALER_STAND_TOTAL) {
       round.dealerHand.push(drawCard())
       playSound('deal')
-      renderTable(true)
+      renderTable()
+      renderShoe()
+      saveGame()
       setTimeout(step, 450)
       return
     }
@@ -767,27 +870,45 @@ function finalizeRound(outcomes, message) {
 
   outcomes.forEach(({ hand, outcome }) => {
     applyOutcome(hand, outcome)
+    hand.result = { outcome, net: Core.getOutcomeNet(hand.bet, outcome) }
   })
 
   if (round.insuranceBet > 0 && !dealerHasBlackjack()) {
     stats.totalLost += round.insuranceBet
   }
 
+  let dailyEndedBy = null
   if (challenge.active) {
     challenge.roundsPlayed += 1
+    if (challenge.roundsPlayed >= DAILY_ROUND_LIMIT) {
+      dailyEndedBy = 'limit'
+    } else if (player.chips <= 0) {
+      dailyEndedBy = 'bust'
+    }
   }
 
   const netChange = player.chips - (round.chipsBeforeRound ?? player.chips)
   addHistoryEntry(outcomes, netChange)
   checkAchievements()
 
+  let finalMessage = message
+  if (dailyEndedBy) {
+    completeDailyChallenge(dailyEndedBy)
+    finalMessage = `${message} Daily Challenge complete. Your result is saved for today.`
+  }
+
   renderAll()
-  setMessage(message)
+  setMessage(finalMessage)
   saveGame()
 
   clearResetTimer()
   resetTimer = setTimeout(() => {
+    // Keep the settled cards on the felt until the next deal, but start a clean round.
+    const previous = round
     round = createEmptyRound()
+    round.hands = previous.hands
+    round.dealerHand = previous.dealerHand
+    round.settled = true
     if (player.chips <= 0) {
       player.chips = 1000
       setMessage('Bankroll reset to $1000. Place your next bet.')
@@ -945,7 +1066,8 @@ function dealerHasBlackjack() {
 function renderAll() {
   renderPlayer()
   renderBetting()
-  renderTable(false)
+  renderTable()
+  renderShoe()
   renderButtons()
   renderChallenge()
   renderStats()
@@ -957,21 +1079,37 @@ function renderAll() {
 }
 
 function renderChallenge() {
-  const todaySeed = getCurrentLocalDateKey()
-  const seedLabel = challenge.active ? challenge.seedDate : todaySeed
-  const net = challenge.active ? player.chips - challenge.startingChips : 0
+  const today = getCurrentLocalDateKey()
+  const playedToday = Core.hasDailyAttempt(dailyLog, today)
+  const result = getDailyResultSummary()
+  const net = result ? result.net : 0
+  const rounds = result ? result.rounds : 0
 
-  elements['challenge-seed'].textContent = `Seed: ${seedLabel}`
-  elements['challenge-status'].textContent = challenge.active ? 'Active' : 'Inactive'
-  elements['challenge-rounds'].textContent = challenge.active ? String(challenge.roundsPlayed) : '0'
+  let shoeLabel = "Today's shoe: sealed until you start"
+  let statusLabel = playedToday ? 'Played' : 'Ready'
+  if (challenge.active) {
+    shoeLabel = "Today's shoe: in play"
+    statusLabel = 'Active'
+  } else if (playedToday) {
+    shoeLabel = "Today's shoe: played, new shoe tomorrow"
+  }
+
+  elements['challenge-seed'].textContent = shoeLabel
+  elements['challenge-status'].textContent = statusLabel
+  elements['challenge-rounds'].textContent = `${rounds} / ${DAILY_ROUND_LIMIT}`
   elements['challenge-net'].textContent = `${net >= 0 ? '+' : ''}${formatCurrency(net)}`
   elements['challenge-net'].style.color = net >= 0 ? '#49d17b' : '#ea5a63'
 
-  elements['challenge-toggle-btn'].textContent = challenge.active
-    ? 'End Daily Challenge'
-    : 'Start Daily Challenge'
-  elements['challenge-toggle-btn'].disabled = round.phase !== 'betting'
-  elements['challenge-share-btn'].disabled = !challenge.active || challenge.roundsPlayed === 0
+  if (challenge.active) {
+    elements['challenge-toggle-btn'].textContent = 'End Daily Challenge'
+  } else if (playedToday) {
+    elements['challenge-toggle-btn'].textContent = 'Played today'
+  } else {
+    elements['challenge-toggle-btn'].textContent = 'Start Daily Challenge'
+  }
+  elements['challenge-toggle-btn'].disabled =
+    round.phase !== 'betting' || (!challenge.active && playedToday)
+  elements['challenge-share-btn'].disabled = !result || result.rounds === 0
 
   elements['challenge-panel'].classList.toggle('challenge-active', challenge.active)
 }
@@ -982,107 +1120,200 @@ function renderPlayer() {
 
 function renderBetting() {
   elements['current-bet'].textContent = `Current Bet: ${formatCurrency(round.bet)}`
+  elements['bet-stack'].replaceChildren(TableArt.createChipStack(round.bet))
 }
 
-function renderTable(animate) {
-  const hideDealerHoleCard = round.phase === 'player-turn' || round.phase === 'insurance-offer'
+function renderShoe() {
+  const remaining = shoe.length
+  elements['shoe-count'].textContent = String(remaining)
+  elements['shoe-meter-fill'].style.width = `${Math.round((remaining / SHOE_SIZE) * 100)}%`
+  elements['shoe-el'].setAttribute(
+    'aria-label',
+    `Shoe: ${remaining} of ${SHOE_SIZE} cards left. Reshuffles between rounds below ${RESHUFFLE_THRESHOLD}.`
+  )
+}
+
+// Cards that were already on the felt do not re-animate; only newly dealt ones do.
+const renderedCardCounts = new WeakMap()
+
+function renderTable() {
+  const hideDealerHoleCard = round.phase === 'player-turn'
+  elements.felt.classList.toggle('is-resting', round.settled && round.phase === 'betting')
 
   renderCards(elements['dealer-cards'], round.dealerHand, {
     hideSecondCard: hideDealerHoleCard,
-    animate,
+    slots: 2,
   })
 
-  const activeHand = getActiveHand()
-  renderCards(elements['cards-el'], activeHand ? activeHand.cards : [], { animate })
+  renderPlayerHands()
 
   const dealerTotal = hideDealerHoleCard
     ? round.dealerHand.length
       ? getCardNumericValue(round.dealerHand[0].rank)
       : null
-    : getHandValue(round.dealerHand).total
+    : round.dealerHand.length
+      ? getHandValue(round.dealerHand).total
+      : null
 
   elements['dealer-sum-el'].textContent =
     dealerTotal === null ? 'Total: --' : `Total: ${dealerTotal}`
 
-  if (activeHand) {
-    const handValue = getHandValue(activeHand.cards).total
-    elements['sum-el'].textContent = `Total: ${handValue}`
-    elements['active-hand-indicator'].textContent = `Hand ${round.activeHandIndex + 1}`
+  const handCount = round.hands.length
+  if (round.phase === 'player-turn' && handCount > 1) {
+    elements['active-hand-indicator'].textContent =
+      `Hand ${round.activeHandIndex + 1} of ${handCount}`
+  } else if (round.phase === 'betting' && round.settled) {
+    elements['active-hand-indicator'].textContent =
+      handCount > 1 ? `${handCount} hands` : 'Last hand'
   } else {
-    elements['sum-el'].textContent = 'Total: --'
-    elements['active-hand-indicator'].textContent = 'Hand 1'
+    elements['active-hand-indicator'].textContent = handCount > 1 ? `${handCount} hands` : 'Hand 1'
   }
 
   const phaseLabel = {
-    betting: 'Idle',
-    'player-turn': 'Player',
-    'dealer-turn': 'Dealer',
+    betting: 'Waiting for bet',
+    'player-turn': 'Your turn',
+    'dealer-turn': 'Drawing',
     'round-over': 'Settled',
   }
 
-  elements['dealer-phase'].textContent = phaseLabel[round.phase] || 'Idle'
+  elements['dealer-phase'].textContent = phaseLabel[round.phase] || 'Waiting for bet'
 }
 
-function renderCards(container, cards, options = {}) {
-  const { hideSecondCard = false, animate = false } = options
-  container.innerHTML = ''
+const RESULT_LABELS = {
+  blackjack: 'Blackjack',
+  win: 'Win',
+  push: 'Push',
+  lose: 'Lose',
+  bust: 'Bust',
+  surrender: 'Surrender',
+}
 
-  if (!cards || cards.length === 0) {
+function formatSignedCurrency(value) {
+  if (value === 0) return ''
+  return `${value > 0 ? '+' : '-'}${formatCurrency(Math.abs(value))}`
+}
+
+function describeHandState(hand, isActive) {
+  if (hand.result) {
+    return null
+  }
+  const value = getHandValue(hand.cards)
+  if (value.isBust) return 'Bust'
+  if (hand.surrendered) return 'Surrendered'
+  if (hand.doubled) return 'Doubled'
+  if (hand.finished) return value.total === BLACKJACK_TOTAL ? '21' : 'Standing'
+  return isActive && round.phase === 'player-turn' ? 'Playing' : 'Waiting'
+}
+
+function renderPlayerHands() {
+  const container = elements['player-hands']
+  container.replaceChildren()
+  container.dataset.count = String(round.hands.length)
+
+  if (round.hands.length === 0) {
+    const lane = document.createElement('li')
+    lane.className = 'hand-lane is-empty'
+    const slots = document.createElement('ul')
+    slots.className = 'cards-container'
+    slots.setAttribute('aria-label', 'Player cards')
+    appendEmptySlots(slots, 2)
+    lane.append(slots)
+    container.append(lane)
     return
   }
 
-  cards.forEach((card, index) => {
-    const hidden = hideSecondCard && index === 1
-    container.appendChild(createCardElement(card, hidden, animate))
+  round.hands.forEach((hand, index) => {
+    const isActive = round.phase === 'player-turn' && index === round.activeHandIndex
+    const value = getHandValue(hand.cards)
+    const lane = document.createElement('li')
+    lane.className = 'hand-lane'
+    if (isActive) {
+      lane.classList.add('is-active')
+      lane.setAttribute('aria-current', 'true')
+    }
+    if (hand.result) {
+      lane.classList.add(`result-${hand.result.outcome}`)
+    }
+
+    const title = round.hands.length > 1 ? `Hand ${index + 1}` : 'Your hand'
+    const head = document.createElement('div')
+    head.className = 'lane-head'
+    const heading = document.createElement('span')
+    heading.className = 'lane-title'
+    heading.textContent = title
+    head.append(heading)
+
+    const state = describeHandState(hand, isActive)
+    if (state) {
+      const stateTag = document.createElement('span')
+      stateTag.className = 'lane-state'
+      stateTag.textContent = state
+      head.append(stateTag)
+    }
+
+    const cardList = document.createElement('ul')
+    cardList.className = 'cards-container'
+    cardList.setAttribute('aria-label', `${title} cards`)
+    renderCards(cardList, hand.cards, { key: hand })
+
+    const foot = document.createElement('div')
+    foot.className = 'lane-foot'
+
+    const total = document.createElement('span')
+    total.className = 'lane-total'
+    total.textContent = `${value.isSoft && !value.isBust && value.total < BLACKJACK_TOTAL ? 'Soft ' : ''}${value.total}`
+    total.setAttribute('aria-label', `Total ${value.total}`)
+
+    const bet = document.createElement('span')
+    bet.className = 'lane-bet'
+    bet.append(TableArt.createChipStack(hand.bet))
+    const betText = document.createElement('span')
+    betText.className = 'lane-bet-text'
+    betText.textContent = formatCurrency(hand.bet)
+    betText.setAttribute('aria-label', `Bet ${formatCurrency(hand.bet)}`)
+    bet.append(betText)
+
+    foot.append(total, bet)
+
+    lane.append(head, cardList, foot)
+
+    if (hand.result) {
+      const result = document.createElement('p')
+      result.className = `lane-result result-${hand.result.outcome}`
+      const signed = formatSignedCurrency(hand.result.net)
+      result.textContent = `${RESULT_LABELS[hand.result.outcome] ?? hand.result.outcome}${signed ? ` ${signed}` : ''}`
+      lane.append(result)
+    }
+
+    container.append(lane)
   })
 }
 
-function createCardElement(card, hidden, animate) {
-  const node = document.createElement('li')
-  node.className = 'card'
-  if (animate) node.classList.add('dealing')
+function appendEmptySlots(container, count) {
+  for (let i = 0; i < count; i += 1) {
+    const slot = document.createElement('li')
+    slot.className = 'card-slot'
+    slot.setAttribute('aria-hidden', 'true')
+    container.append(slot)
+  }
+}
 
-  if (hidden) {
-    node.classList.add('hidden')
-    return node
+function renderCards(container, cards, options = {}) {
+  const { hideSecondCard = false, slots = 0, key = cards } = options
+  container.replaceChildren()
+
+  if (!cards || cards.length === 0) {
+    appendEmptySlots(container, slots)
+    return
   }
 
-  if (card.suit === '♥' || card.suit === '♦') {
-    node.classList.add('red')
-  }
-
-  const top = document.createElement('div')
-  top.className = 'card-top'
-
-  const topRank = document.createElement('span')
-  topRank.className = 'card-rank'
-  topRank.textContent = card.rank
-
-  const topSuit = document.createElement('span')
-  topSuit.className = 'card-suit'
-  topSuit.textContent = card.suit
-
-  top.append(topRank, topSuit)
-
-  const center = document.createElement('div')
-  center.className = 'card-center'
-  center.textContent = card.suit
-
-  const bottom = document.createElement('div')
-  bottom.className = 'card-bottom'
-
-  const bottomRank = document.createElement('span')
-  bottomRank.className = 'card-rank'
-  bottomRank.textContent = card.rank
-
-  const bottomSuit = document.createElement('span')
-  bottomSuit.className = 'card-suit'
-  bottomSuit.textContent = card.suit
-
-  bottom.append(bottomRank, bottomSuit)
-
-  node.append(top, center, bottom)
-  return node
+  const alreadyShown = renderedCardCounts.get(key) ?? 0
+  cards.forEach((card, index) => {
+    const hidden = hideSecondCard && index === 1
+    const animate = !suppressDealAnimation && index >= alreadyShown
+    container.append(TableArt.createCardElement(card, { hidden, animate }))
+  })
+  renderedCardCounts.set(key, cards.length)
 }
 
 function renderButtons() {
@@ -1307,8 +1538,7 @@ function getHandValue(cards) {
 }
 
 function buildShoe(force) {
-  const minimumCards = 52
-  if (!force && shoe.length >= minimumCards) {
+  if (!force && shoe.length >= RESHUFFLE_THRESHOLD) {
     return
   }
 
@@ -1316,20 +1546,65 @@ function buildShoe(force) {
     const challengeSeed = `${challenge.seedDate}:${challenge.reshuffles}`
     shoe = Core.createSeededShoe(challengeSeed, SHOE_DECKS)
     challenge.reshuffles += 1
+    challenge.drawn = 0
   } else {
     const freshShoe = Core.createShoe(SHOE_DECKS)
     shoe = Core.shuffle(freshShoe)
   }
 }
 
-function drawCard() {
-  if (shoe.length < 52) {
-    buildShoe(true)
-    if (challenge.active) {
-      setMessage(`Challenge shoe reshuffled (pass ${challenge.reshuffles}).`)
-    } else {
-      setMessage('Shoe reshuffled for a fresh run.')
+// Rebuild the shoe a reload interrupted. A daily shoe is rebuilt from its date and the count
+// of cards already dealt, so a reload can neither re-roll it nor restart it.
+function restoreShoe() {
+  if (challenge.active && challenge.reshuffles > 0 && Number.isInteger(challenge.drawn)) {
+    const full = Core.createSeededShoe(
+      `${challenge.seedDate}:${challenge.reshuffles - 1}`,
+      SHOE_DECKS
+    )
+    const remaining = full.length - challenge.drawn
+    if (remaining >= 0) {
+      shoe = full.slice(0, remaining)
+      return
     }
+  }
+
+  const decoded = Core.decodeShoe(savedShoe)
+  savedShoe = null
+  if (decoded && decoded.length > 0 && !challenge.active) {
+    shoe = decoded
+    return
+  }
+
+  buildShoe(true)
+}
+
+function resumeSavedRound() {
+  if (!savedRound) {
+    return null
+  }
+
+  const restored = Core.sanitizeRoundSnapshot(savedRound)
+  const staleChips = Number.isFinite(savedRound.chipsBeforeRound)
+    ? savedRound.chipsBeforeRound
+    : null
+  savedRound = null
+
+  if (!restored) {
+    if (staleChips !== null) {
+      player.chips = staleChips
+      resumeNotice = 'Your last round could not be restored, so the bet was returned.'
+      saveGame()
+    }
+    return null
+  }
+
+  round = restored
+  return restored.phase
+}
+
+function drawCard() {
+  if (shoe.length === 0) {
+    buildShoe(true)
   }
 
   return Core.drawCard(shoe)
@@ -1389,12 +1664,21 @@ function playSound(type) {
 }
 
 function saveGame() {
+  const resumable = round.phase === 'player-turn' || round.phase === 'dealer-turn'
+  if (challenge.active) {
+    challenge.drawn = SHOE_SIZE - shoe.length
+  }
+
   const snapshot = {
     version: 2,
     player,
     stats,
     history,
     challenge,
+    dailyLog,
+    round: resumable ? round : null,
+    // A daily shoe is rebuilt from its date and `challenge.drawn`; only a standard shoe is stored.
+    shoe: resumable && !challenge.active ? Core.encodeShoe(shoe) : null,
   }
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
@@ -1435,6 +1719,15 @@ function loadGame() {
         ...data.challenge,
       }
     }
+
+    dailyLog = Core.sanitizeDailyLog(data.dailyLog)
+    // A legacy active challenge predates the log: record it so it cannot be restarted today.
+    if (challenge.active && !Core.hasDailyAttempt(dailyLog, challenge.seedDate)) {
+      dailyLog = Core.startDailyAttempt(dailyLog, challenge.seedDate)
+    }
+
+    savedRound = data.round ?? null
+    savedShoe = typeof data.shoe === 'string' ? data.shoe : null
   } catch (error) {
     console.warn('Failed to load saved game state:', error)
   }

@@ -28,6 +28,7 @@ no framework, no build step.
 - `index.js` - main engine and UI logic
 - `blackjack-core.js` - pure blackjack game logic (deck, hand resolution, payouts), separated
   so it can be unit tested without a DOM
+- `cards.js` - inline-SVG card faces and chip stacks (`window.TableArt`), no external assets
 - `index.css` - visual system and responsive layout
 - `posthog.js` - PostHog analytics init (client-side project token, not a secret)
 - `sounds/` - game sound effects
@@ -42,7 +43,10 @@ no framework, no build step.
   Surrender.
 - Dealer stands on all 17s. Blackjack pays 3:2.
 - Keyboard shortcuts: `H`, `S`, `D`, `P`, `I`, `R`.
-- Persistence (profile, stats, achievements, history) uses `localStorage`, no backend.
+- Persistence (profile, stats, achievements, history) uses `localStorage`, no backend. An in-progress round
+  (and a standard shoe, or a daily shoe's `drawn` count) is saved after every action and resumed on reload.
+- Daily Challenge: one attempt per local date (`dailyLog`), 20 rounds, ending early still uses the day.
+  Client-only, so it is a guard against casual replay, not tamper-proof.
 
 ## Testing
 

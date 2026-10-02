@@ -142,3 +142,238 @@ test('resolveHandOutcome returns expected result across scenarios', () => {
   )
   assert.equal(surrendered, 'surrender')
 })
+
+test('resolveHandOutcome gives a dealer natural precedence over any non-natural 21', () => {
+  const dealerNatural = [
+    { rank: 'A', suit: '♠' },
+    { rank: 'K', suit: '♦' },
+  ]
+  const threeCardTwentyOne = [
+    { rank: '7', suit: '♦' },
+    { rank: '7', suit: '♥' },
+    { rank: '7', suit: '♣' },
+  ]
+  const splitTwentyOne = [
+    { rank: 'A', suit: '♦' },
+    { rank: 'K', suit: '♥' },
+  ]
+  const playerNatural = [
+    { rank: 'A', suit: '♥' },
+    { rank: 'Q', suit: '♣' },
+  ]
+
+  assert.equal(Core.resolveHandOutcome(threeCardTwentyOne, dealerNatural), 'lose')
+  assert.equal(
+    Core.resolveHandOutcome(splitTwentyOne, dealerNatural, { splitOrigin: true }),
+    'lose'
+  )
+  assert.equal(Core.resolveHandOutcome(playerNatural, dealerNatural), 'push')
+})
+
+test('resolveHandOutcome pays a player natural 3:2 even against a dealer 3-card 21', () => {
+  const dealerThreeCardTwentyOne = [
+    { rank: '7', suit: '♠' },
+    { rank: '7', suit: '♦' },
+    { rank: '7', suit: '♣' },
+  ]
+  const playerNatural = [
+    { rank: 'A', suit: '♥' },
+    { rank: 'K', suit: '♣' },
+  ]
+
+  assert.equal(Core.resolveHandOutcome(playerNatural, dealerThreeCardTwentyOne), 'blackjack')
+  assert.equal(
+    Core.resolveHandOutcome(playerNatural, dealerThreeCardTwentyOne, { splitOrigin: true }),
+    'push'
+  )
+})
+
+test('resolveHandOutcome covers bust, dealer bust, and plain comparisons', () => {
+  const bust = [
+    { rank: 'K', suit: '♠' },
+    { rank: 'Q', suit: '♦' },
+    { rank: '5', suit: '♣' },
+  ]
+  const dealerBust = [
+    { rank: 'K', suit: '♠' },
+    { rank: '6', suit: '♦' },
+    { rank: '9', suit: '♣' },
+  ]
+  const eighteen = [
+    { rank: '10', suit: '♠' },
+    { rank: '8', suit: '♦' },
+  ]
+  const seventeen = [
+    { rank: '10', suit: '♥' },
+    { rank: '7', suit: '♦' },
+  ]
+
+  assert.equal(Core.resolveHandOutcome(bust, dealerBust), 'bust')
+  assert.equal(Core.resolveHandOutcome(eighteen, dealerBust), 'win')
+  assert.equal(Core.resolveHandOutcome(seventeen, eighteen), 'lose')
+  assert.equal(Core.resolveHandOutcome(eighteen, seventeen), 'win')
+})
+
+// ---- Round persistence (mid-round refresh must resume, not refund) ----
+
+function sampleRound(overrides = {}) {
+  return {
+    phase: 'player-turn',
+    bet: 100,
+    betStack: [100],
+    dealerHand: [
+      { rank: '6', suit: '♦' },
+      { rank: '10', suit: '♣' },
+    ],
+    hands: [
+      {
+        bet: 100,
+        cards: [
+          { rank: '8', suit: '♠' },
+          { rank: '8', suit: '♥' },
+        ],
+        finished: false,
+        surrendered: false,
+        doubled: false,
+        splitOrigin: false,
+        splitAces: false,
+      },
+    ],
+    activeHandIndex: 0,
+    canInsurance: false,
+    insuranceBet: 0,
+    hasTakenAction: false,
+    chipsBeforeRound: 1000,
+    ...overrides,
+  }
+}
+
+test('sanitizeRoundSnapshot restores a JSON round-tripped in-progress round', () => {
+  const restored = Core.sanitizeRoundSnapshot(JSON.parse(JSON.stringify(sampleRound())))
+  assert.deepEqual(restored, sampleRound())
+})
+
+test('sanitizeRoundSnapshot restores a dealer-turn round with several split hands', () => {
+  const base = sampleRound().hands[0]
+  const round = sampleRound({
+    phase: 'dealer-turn',
+    activeHandIndex: 1,
+    hands: [
+      { ...base, finished: true, splitOrigin: true },
+      { ...base, finished: true, splitOrigin: true, doubled: true, bet: 200 },
+    ],
+  })
+  const restored = Core.sanitizeRoundSnapshot(JSON.parse(JSON.stringify(round)))
+  assert.equal(restored.phase, 'dealer-turn')
+  assert.equal(restored.hands.length, 2)
+  assert.equal(restored.hands[1].bet, 200)
+})
+
+test('sanitizeRoundSnapshot refuses settled, empty, or corrupted rounds', () => {
+  assert.equal(Core.sanitizeRoundSnapshot(null), null)
+  assert.equal(Core.sanitizeRoundSnapshot('nope'), null)
+  assert.equal(Core.sanitizeRoundSnapshot(sampleRound({ phase: 'round-over' })), null)
+  assert.equal(Core.sanitizeRoundSnapshot(sampleRound({ phase: 'betting' })), null)
+  assert.equal(Core.sanitizeRoundSnapshot(sampleRound({ hands: [] })), null)
+  assert.equal(Core.sanitizeRoundSnapshot(sampleRound({ activeHandIndex: 3 })), null)
+  assert.equal(
+    Core.sanitizeRoundSnapshot(sampleRound({ dealerHand: [{ rank: 'Z', suit: '♠' }] })),
+    null
+  )
+  assert.equal(Core.sanitizeRoundSnapshot(sampleRound({ bet: -5 })), null)
+  assert.equal(Core.sanitizeRoundSnapshot(sampleRound({ chipsBeforeRound: 'lots' })), null)
+})
+
+test('encodeShoe and decodeShoe round-trip, and decodeShoe rejects garbage', () => {
+  const shoe = Core.createSeededShoe('2026-10-02:0', 6)
+  const decoded = Core.decodeShoe(Core.encodeShoe(shoe))
+  assert.deepEqual(decoded, shoe)
+  assert.equal(Core.decodeShoe('not a shoe'), null)
+  assert.equal(Core.decodeShoe(42), null)
+  assert.deepEqual(Core.decodeShoe(''), [])
+})
+
+// ---- Daily Challenge lock (one attempt per date) ----
+
+test('a started daily attempt cannot be started again the same day', () => {
+  let log = {}
+  assert.equal(Core.hasDailyAttempt(log, '2026-10-02'), false)
+
+  log = Core.startDailyAttempt(log, '2026-10-02')
+  assert.equal(Core.hasDailyAttempt(log, '2026-10-02'), true)
+  assert.equal(log['2026-10-02'].status, 'active')
+
+  // Ending it early records the result but does not reopen the day.
+  log = Core.finishDailyAttempt(log, '2026-10-02', {
+    rounds: 3,
+    net: -150,
+    bankroll: 850,
+    endedBy: 'ended',
+  })
+  assert.equal(Core.hasDailyAttempt(log, '2026-10-02'), true)
+  assert.deepEqual(log['2026-10-02'], {
+    status: 'complete',
+    rounds: 3,
+    net: -150,
+    bankroll: 850,
+    endedBy: 'ended',
+  })
+
+  assert.equal(Core.hasDailyAttempt(log, '2026-10-03'), false)
+})
+
+test('daily log is immutable input-wise and keeps only recent days', () => {
+  const original = {
+    '2026-01-01': { status: 'complete', rounds: 1, net: 0, bankroll: 1000, endedBy: 'limit' },
+  }
+  const next = Core.startDailyAttempt(original, '2026-10-02')
+  assert.equal(Object.keys(original).length, 1)
+  assert.equal(Object.keys(next).length, 2)
+
+  let log = {}
+  for (let day = 1; day <= 40; day += 1) {
+    log = Core.startDailyAttempt(log, `2026-09-${String(day).padStart(2, '0')}`)
+  }
+  assert.ok(Object.keys(log).length <= Core.DAILY_LOG_DAYS)
+  assert.ok(log['2026-09-40'] !== undefined)
+})
+
+test('sanitizeDailyLog drops malformed entries', () => {
+  const log = Core.sanitizeDailyLog({
+    '2026-10-02': { status: 'complete', rounds: 5, net: 20, bankroll: 1020, endedBy: 'limit' },
+    'bad-key': { status: 'complete' },
+    '2026-10-03': 'nope',
+  })
+  assert.deepEqual(Object.keys(log), ['2026-10-02'])
+  assert.deepEqual(Core.sanitizeDailyLog(null), {})
+})
+
+// ---- Table helpers ----
+
+test('describeCard gives screen-reader names', () => {
+  assert.equal(Core.describeCard({ rank: 'Q', suit: '♥' }), 'Queen of hearts')
+  assert.equal(Core.describeCard({ rank: 'A', suit: '♠' }), 'Ace of spades')
+  assert.equal(Core.describeCard({ rank: '10', suit: '♦' }), '10 of diamonds')
+  assert.equal(Core.describeCard({ rank: '7', suit: '♣' }), '7 of clubs')
+})
+
+test('breakIntoChips uses the fewest chips, largest first', () => {
+  assert.deepEqual(Core.breakIntoChips(0), [])
+  assert.deepEqual(Core.breakIntoChips(5), [{ value: 5, count: 1 }])
+  assert.deepEqual(Core.breakIntoChips(630), [
+    { value: 500, count: 1 },
+    { value: 100, count: 1 },
+    { value: 25, count: 1 },
+    { value: 5, count: 1 },
+  ])
+  assert.deepEqual(Core.breakIntoChips(1000), [{ value: 500, count: 2 }])
+})
+
+test('getOutcomeNet matches the table payouts', () => {
+  assert.equal(Core.getOutcomeNet(100, 'blackjack'), 150)
+  assert.equal(Core.getOutcomeNet(100, 'win'), 100)
+  assert.equal(Core.getOutcomeNet(100, 'push'), 0)
+  assert.equal(Core.getOutcomeNet(100, 'lose'), -100)
+  assert.equal(Core.getOutcomeNet(100, 'bust'), -100)
+  assert.equal(Core.getOutcomeNet(100, 'surrender'), -50)
+})

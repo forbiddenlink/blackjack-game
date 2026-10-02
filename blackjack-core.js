@@ -122,16 +122,194 @@
     const dealerValue = getHandValue(dealerCards)
 
     if (playerValue.isBust) return 'bust'
-    if (dealerValue.isBust) {
-      return playerValue.isBlackjack && !splitOrigin ? 'blackjack' : 'win'
-    }
 
+    // A natural is a two-card 21 that did not come from a split. A dealer natural beats any
+    // non-natural 21, and a player natural beats a dealer 21 made with three or more cards.
+    const playerNatural = playerValue.isBlackjack && !splitOrigin
+    const dealerNatural = dealerValue.isBlackjack
+    if (dealerNatural) return playerNatural ? 'push' : 'lose'
+    if (playerNatural) return 'blackjack'
+
+    if (dealerValue.isBust) return 'win'
     if (dealerValue.total > playerValue.total) return 'lose'
-    if (dealerValue.total < playerValue.total) {
-      return playerValue.isBlackjack && !splitOrigin ? 'blackjack' : 'win'
-    }
+    if (dealerValue.total < playerValue.total) return 'win'
 
     return 'push'
+  }
+
+  // ---- Naming and chips (table presentation helpers) ----
+
+  const RANK_NAMES = { A: 'Ace', J: 'Jack', Q: 'Queen', K: 'King' }
+  const SUIT_NAMES = { '♠': 'spades', '♥': 'hearts', '♦': 'diamonds', '♣': 'clubs' }
+  const CHIP_VALUES = [500, 100, 25, 5]
+
+  function describeCard(card) {
+    return `${RANK_NAMES[card.rank] ?? card.rank} of ${SUIT_NAMES[card.suit] ?? card.suit}`
+  }
+
+  function breakIntoChips(amount) {
+    let remaining = Math.max(0, Math.floor(Number(amount) || 0))
+    const chips = []
+    CHIP_VALUES.forEach((value) => {
+      const count = Math.floor(remaining / value)
+      if (count > 0) {
+        chips.push({ value, count })
+        remaining -= count * value
+      }
+    })
+    return chips
+  }
+
+  function getOutcomeNet(bet, outcome) {
+    switch (outcome) {
+      case 'blackjack':
+        return bet * 1.5
+      case 'win':
+        return bet
+      case 'lose':
+      case 'bust':
+        return -bet
+      case 'surrender':
+        return -bet / 2
+      default:
+        return 0
+    }
+  }
+
+  // ---- Round persistence ----
+  // A round saved mid-play is restored on reload so a refresh cannot void or refund a hand.
+
+  const RESUMABLE_PHASES = ['player-turn', 'dealer-turn']
+  const MAX_SAVED_HANDS = 4
+
+  function isValidCard(card) {
+    return Boolean(card) && RANKS.includes(card.rank) && SUITS.includes(card.suit)
+  }
+
+  function isCardList(cards, minimum) {
+    return Array.isArray(cards) && cards.length >= minimum && cards.every(isValidCard)
+  }
+
+  function sanitizeSavedHand(raw) {
+    if (!raw || typeof raw !== 'object') return null
+    if (!Number.isFinite(raw.bet) || raw.bet <= 0) return null
+    if (!isCardList(raw.cards, 1)) return null
+
+    return {
+      bet: raw.bet,
+      cards: raw.cards.map((card) => ({ rank: card.rank, suit: card.suit })),
+      finished: Boolean(raw.finished),
+      surrendered: Boolean(raw.surrendered),
+      doubled: Boolean(raw.doubled),
+      splitOrigin: Boolean(raw.splitOrigin),
+      splitAces: Boolean(raw.splitAces),
+    }
+  }
+
+  function sanitizeRoundSnapshot(raw) {
+    if (!raw || typeof raw !== 'object') return null
+    if (!RESUMABLE_PHASES.includes(raw.phase)) return null
+    if (!isCardList(raw.dealerHand, 2)) return null
+    if (!Number.isFinite(raw.bet) || raw.bet <= 0) return null
+    if (!Number.isFinite(raw.chipsBeforeRound)) return null
+    if (!Array.isArray(raw.hands) || raw.hands.length === 0) return null
+    if (raw.hands.length > MAX_SAVED_HANDS) return null
+
+    const hands = raw.hands.map(sanitizeSavedHand)
+    if (hands.some((hand) => hand === null)) return null
+
+    if (!Number.isInteger(raw.activeHandIndex)) return null
+    if (raw.activeHandIndex < 0 || raw.activeHandIndex >= hands.length) return null
+
+    const insuranceBet =
+      Number.isFinite(raw.insuranceBet) && raw.insuranceBet > 0 ? raw.insuranceBet : 0
+
+    return {
+      phase: raw.phase,
+      bet: raw.bet,
+      betStack: Array.isArray(raw.betStack)
+        ? raw.betStack.filter((amount) => Number.isFinite(amount) && amount > 0)
+        : [],
+      dealerHand: raw.dealerHand.map((card) => ({ rank: card.rank, suit: card.suit })),
+      hands,
+      activeHandIndex: raw.activeHandIndex,
+      canInsurance: Boolean(raw.canInsurance),
+      insuranceBet,
+      hasTakenAction: Boolean(raw.hasTakenAction),
+      chipsBeforeRound: raw.chipsBeforeRound,
+    }
+  }
+
+  function encodeShoe(cards) {
+    return cards.map((card) => `${card.rank}${card.suit}`).join(',')
+  }
+
+  function decodeShoe(encoded) {
+    if (typeof encoded !== 'string') return null
+    if (encoded === '') return []
+
+    const cards = encoded.split(',').map((token) => {
+      const suit = token.slice(-1)
+      const rank = token.slice(0, -1)
+      return { rank, suit }
+    })
+
+    return cards.every(isValidCard) ? cards : null
+  }
+
+  // ---- Daily Challenge: one attempt per local date ----
+
+  const DAILY_ROUND_LIMIT = 20
+  const DAILY_LOG_DAYS = 30
+  const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+  function pruneDailyLog(log) {
+    const keys = Object.keys(log).sort()
+    const kept = keys.slice(Math.max(0, keys.length - DAILY_LOG_DAYS))
+    return Object.fromEntries(kept.map((key) => [key, log[key]]))
+  }
+
+  function hasDailyAttempt(log, dateKey) {
+    return Boolean(log) && Object.hasOwn(log, dateKey)
+  }
+
+  function startDailyAttempt(log, dateKey) {
+    return pruneDailyLog({ ...log, [dateKey]: { status: 'active' } })
+  }
+
+  function finishDailyAttempt(log, dateKey, result) {
+    const { rounds, net, bankroll, endedBy } = result
+    return pruneDailyLog({
+      ...log,
+      [dateKey]: { status: 'complete', rounds, net, bankroll, endedBy },
+    })
+  }
+
+  function sanitizeDailyLog(raw) {
+    if (!raw || typeof raw !== 'object') return {}
+
+    const clean = {}
+    Object.entries(raw).forEach(([key, entry]) => {
+      if (!DATE_KEY_PATTERN.test(key) || !entry || typeof entry !== 'object') return
+      if (entry.status === 'active') {
+        clean[key] = { status: 'active' }
+        return
+      }
+      if (
+        entry.status === 'complete' &&
+        Number.isFinite(entry.rounds) &&
+        Number.isFinite(entry.net)
+      ) {
+        clean[key] = {
+          status: 'complete',
+          rounds: entry.rounds,
+          net: entry.net,
+          bankroll: Number.isFinite(entry.bankroll) ? entry.bankroll : 0,
+          endedBy: String(entry.endedBy ?? 'ended'),
+        }
+      }
+    })
+    return pruneDailyLog(clean)
   }
 
   return {
@@ -148,5 +326,17 @@
     shuffle,
     drawCard,
     resolveHandOutcome,
+    describeCard,
+    breakIntoChips,
+    getOutcomeNet,
+    sanitizeRoundSnapshot,
+    encodeShoe,
+    decodeShoe,
+    DAILY_ROUND_LIMIT,
+    DAILY_LOG_DAYS,
+    hasDailyAttempt,
+    startDailyAttempt,
+    finishDailyAttempt,
+    sanitizeDailyLog,
   }
 })
