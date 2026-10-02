@@ -1170,13 +1170,13 @@ function renderTable() {
   }
 
   const phaseLabel = {
-    betting: 'Idle',
-    'player-turn': 'Player',
-    'dealer-turn': 'Dealer',
+    betting: 'Waiting for bet',
+    'player-turn': 'Your turn',
+    'dealer-turn': 'Drawing',
     'round-over': 'Settled',
   }
 
-  elements['dealer-phase'].textContent = phaseLabel[round.phase] || 'Idle'
+  elements['dealer-phase'].textContent = phaseLabel[round.phase] || 'Waiting for bet'
 }
 
 const RESULT_LABELS = {
