@@ -27,7 +27,7 @@
     "@biomejs/biome": "2.5.14",
     "http-server": "14.1.1"
   },
-  "packageManager": "pnpm@10.34.5",
+  "packageManager": "pnpm@10.34.6",
   "pnpm": {
     "overrides": {
       "follow-redirects": ">=1.16.0 <2",
