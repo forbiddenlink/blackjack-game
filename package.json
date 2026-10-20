@@ -30,7 +30,7 @@
   "packageManager": "pnpm@10.34.7",
   "pnpm": {
     "overrides": {
-      "follow-redirects": ">=1.16.0 <2",
+      "follow-redirects": ">=1.16.1 <2.0.0",
       "qs": ">=6.15.3 <7"
     }
   }
