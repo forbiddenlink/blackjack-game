@@ -162,6 +162,7 @@ let player = {
 }
 
 let stats = createDefaultStats()
+const decisionStats = { graded: 0, optimal: 0 }
 let history = []
 let shoe = []
 let round = createEmptyRound()
@@ -246,6 +247,7 @@ function cacheElements() {
     'stat-total-won',
     'stat-best-streak',
     'stat-wins',
+    'stat-decision-accuracy',
     'stat-losses',
     'stat-pushes',
     'stat-blackjacks',
@@ -607,6 +609,7 @@ function hit() {
     return
   }
 
+  recordDecision(hand, 'hit')
   hand.cards.push(drawCard())
   round.hasTakenAction = true
   round.canInsurance = false
@@ -641,6 +644,7 @@ function stand() {
     return
   }
 
+  recordDecision(hand, 'stand')
   hand.finished = true
   round.hasTakenAction = true
   round.canInsurance = false
@@ -664,6 +668,7 @@ function doubleDown() {
     return
   }
 
+  recordDecision(hand, 'double')
   player.chips -= hand.bet
   stats.totalWagered += hand.bet
   hand.bet *= 2
@@ -699,6 +704,7 @@ function split() {
     return
   }
 
+  recordDecision(hand, 'split')
   player.chips -= hand.bet
   stats.totalWagered += hand.bet
 
@@ -1355,6 +1361,7 @@ function renderStats() {
   elements['stat-pushes'].textContent = String(stats.pushes)
   elements['stat-blackjacks'].textContent = String(stats.blackjacks)
   elements['stat-busts'].textContent = String(stats.busts)
+  renderDecisionAccuracy()
 
   elements['stat-current-streak'].textContent = String(stats.currentStreak)
   elements['stat-double-wins'].textContent = String(stats.doubleDownWins)
@@ -1427,61 +1434,33 @@ function updateHint() {
     return
   }
 
-  const hint = getBasicStrategyHint(hand, round.dealerHand[0])
+  const hint = getBasicStrategyHint(hand)
   elements['hint-el'].textContent = hint ? `Hint: ${hint}` : ''
 }
 
-function getBasicStrategyHint(hand, dealerUpcard) {
-  if (!dealerUpcard) {
-    return ''
-  }
+function getStrategyFor(hand) {
+  return Core.getBasicStrategy(hand.cards, round.dealerHand[0], {
+    canSplit: canSplit(hand),
+    canDouble: canDouble(hand),
+  })
+}
 
-  const dealerValue = getCardNumericValue(dealerUpcard.rank)
-  const values = hand.cards.map((card) => getCardNumericValue(card.rank))
-  const handValue = getHandValue(hand.cards)
+function getBasicStrategyHint(hand) {
+  return getStrategyFor(hand)?.text ?? ''
+}
 
-  if (canSplit(hand)) {
-    const [a, b] = values
-    if (a === 11 && b === 11) return 'Split aces.'
-    if (a === 8 && b === 8) return 'Split 8s.'
-    if (a === 10 && b === 10) return 'Stand on 20.'
-    if (a === 9 && b === 9)
-      return [2, 3, 4, 5, 6, 8, 9].includes(dealerValue) ? 'Split 9s.' : 'Stand.'
-    if (a === 7 && b === 7) return dealerValue <= 7 ? 'Split 7s.' : 'Hit.'
-    if (a === 6 && b === 6) return [2, 3, 4, 5, 6].includes(dealerValue) ? 'Split 6s.' : 'Hit.'
-    if (a === 4 && b === 4) return [5, 6].includes(dealerValue) ? 'Split 4s.' : 'Hit.'
-    if (a <= 3 && b <= 3) return [4, 5, 6, 7].includes(dealerValue) ? 'Split small pairs.' : 'Hit.'
-  }
+// Grade the move about to be played against basic strategy. Session-only, so
+// it needs no change to the saved-game format.
+function recordDecision(hand, action) {
+  const verdict = Core.gradeDecision(getStrategyFor(hand), action)
+  if (verdict === null) return
+  decisionStats.graded += 1
+  if (verdict) decisionStats.optimal += 1
+  renderDecisionAccuracy()
+}
 
-  const hasAce = hand.cards.some((card) => card.rank === 'A')
-  if (hasAce && hand.cards.length === 2) {
-    if (handValue.total >= 19) return 'Stand.'
-    if (handValue.total === 18) {
-      if ([3, 4, 5, 6].includes(dealerValue) && canDouble(hand))
-        return 'Double if allowed, otherwise stand.'
-      if ([2, 7, 8].includes(dealerValue)) return 'Stand.'
-      return 'Hit.'
-    }
-    if (handValue.total <= 17) {
-      if ([4, 5, 6].includes(dealerValue) && canDouble(hand))
-        return 'Double if allowed, otherwise hit.'
-      return 'Hit.'
-    }
-  }
-
-  if (handValue.total >= 17) return 'Stand.'
-  if (handValue.total >= 13 && handValue.total <= 16) {
-    return dealerValue <= 6 ? 'Stand.' : 'Hit.'
-  }
-  if (handValue.total === 12) {
-    return [4, 5, 6].includes(dealerValue) ? 'Stand.' : 'Hit.'
-  }
-  if (handValue.total === 11 && canDouble(hand)) return 'Double if allowed, otherwise hit.'
-  if (handValue.total === 10 && dealerValue <= 9 && canDouble(hand))
-    return 'Double if allowed, otherwise hit.'
-  if (handValue.total === 9 && [3, 4, 5, 6].includes(dealerValue) && canDouble(hand))
-    return 'Double if allowed, otherwise hit.'
-  return 'Hit.'
+function renderDecisionAccuracy() {
+  elements['stat-decision-accuracy'].textContent = Core.formatAccuracy(decisionStats)
 }
 
 function checkAchievements() {
@@ -1669,7 +1648,8 @@ function useSessionOnlyStorage() {
   storageAvailable = false
   const warning = elements['storage-warning']
   if (warning) {
-    warning.textContent = 'Storage unavailable: playing in this session only. Progress and Daily Challenge records may be lost when you reload or close this tab.'
+    warning.textContent =
+      'Storage unavailable: playing in this session only. Progress and Daily Challenge records may be lost when you reload or close this tab.'
     warning.hidden = false
   }
 }

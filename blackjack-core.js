@@ -312,6 +312,85 @@
     return pruneDailyLog(clean)
   }
 
+  // Basic strategy recommendation. Returns { action, text } where action is one of
+  // 'hit' | 'stand' | 'double' | 'split', or null without a dealer upcard.
+  // `text` is the player-facing hint wording.
+  function getBasicStrategy(cards, dealerUpcard, options = {}) {
+    if (!dealerUpcard) return null
+    const canSplit = options.canSplit === true
+    const canDouble = options.canDouble === true
+    const pick = (action, text) => ({ action, text })
+
+    const dealerValue = getCardNumericValue(dealerUpcard.rank)
+    const values = cards.map((c) => getCardNumericValue(c.rank))
+    const total = getHandValue(cards).total
+
+    if (canSplit) {
+      const [a, b] = values
+      if (a === 11 && b === 11) return pick('split', 'Split aces.')
+      if (a === 8 && b === 8) return pick('split', 'Split 8s.')
+      if (a === 10 && b === 10) return pick('stand', 'Stand on 20.')
+      if (a === 9 && b === 9)
+        return [2, 3, 4, 5, 6, 8, 9].includes(dealerValue)
+          ? pick('split', 'Split 9s.')
+          : pick('stand', 'Stand.')
+      if (a === 7 && b === 7)
+        return dealerValue <= 7 ? pick('split', 'Split 7s.') : pick('hit', 'Hit.')
+      if (a === 6 && b === 6)
+        return [2, 3, 4, 5, 6].includes(dealerValue)
+          ? pick('split', 'Split 6s.')
+          : pick('hit', 'Hit.')
+      if (a === 4 && b === 4)
+        return [5, 6].includes(dealerValue) ? pick('split', 'Split 4s.') : pick('hit', 'Hit.')
+      if (a <= 3 && b <= 3)
+        return [4, 5, 6, 7].includes(dealerValue)
+          ? pick('split', 'Split small pairs.')
+          : pick('hit', 'Hit.')
+    }
+
+    const hasAce = cards.some((c) => c.rank === 'A')
+    if (hasAce && cards.length === 2) {
+      if (total >= 19) return pick('stand', 'Stand.')
+      if (total === 18) {
+        if ([3, 4, 5, 6].includes(dealerValue)) {
+          return canDouble
+            ? pick('double', 'Double if allowed, otherwise stand.')
+            : pick('stand', 'Stand.')
+        }
+        if ([2, 7, 8].includes(dealerValue)) return pick('stand', 'Stand.')
+        return pick('hit', 'Hit.')
+      }
+      if (total <= 17) {
+        if ([4, 5, 6].includes(dealerValue) && canDouble)
+          return pick('double', 'Double if allowed, otherwise hit.')
+        return pick('hit', 'Hit.')
+      }
+    }
+
+    if (total >= 17) return pick('stand', 'Stand.')
+    if (total >= 13 && total <= 16)
+      return dealerValue <= 6 ? pick('stand', 'Stand.') : pick('hit', 'Hit.')
+    if (total === 12)
+      return [4, 5, 6].includes(dealerValue) ? pick('stand', 'Stand.') : pick('hit', 'Hit.')
+    if (total === 11 && canDouble) return pick('double', 'Double if allowed, otherwise hit.')
+    if (total === 10 && dealerValue <= 9 && canDouble)
+      return pick('double', 'Double if allowed, otherwise hit.')
+    if (total === 9 && [3, 4, 5, 6].includes(dealerValue) && canDouble)
+      return pick('double', 'Double if allowed, otherwise hit.')
+    return pick('hit', 'Hit.')
+  }
+
+  // true/false for a played action vs. the recommendation, null when ungradeable.
+  function gradeDecision(recommendation, action) {
+    if (!recommendation) return null
+    return recommendation.action === action
+  }
+
+  function formatAccuracy({ graded, optimal }) {
+    if (!graded) return '-'
+    return `${Math.round((optimal / graded) * 100)}% (${optimal}/${graded})`
+  }
+
   return {
     BLACKJACK_TOTAL,
     DEALER_STAND_TOTAL,
@@ -320,6 +399,9 @@
     getCardNumericValue,
     getSplitValue,
     getHandValue,
+    getBasicStrategy,
+    gradeDecision,
+    formatAccuracy,
     createShoe,
     createSeededRng,
     createSeededShoe,

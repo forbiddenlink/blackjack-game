@@ -377,3 +377,59 @@ test('getOutcomeNet matches the table payouts', () => {
   assert.equal(Core.getOutcomeNet(100, 'bust'), -100)
   assert.equal(Core.getOutcomeNet(100, 'surrender'), -50)
 })
+
+const card = (rank, suit = '♠') => ({ rank, suit })
+const both = { canSplit: true, canDouble: true }
+const neither = { canSplit: false, canDouble: false }
+
+test('getBasicStrategy: hard totals', () => {
+  assert.equal(Core.getBasicStrategy([card('10'), card('6')], card('10'), neither).action, 'hit')
+  assert.equal(Core.getBasicStrategy([card('10'), card('6')], card('6'), neither).action, 'stand')
+  assert.equal(Core.getBasicStrategy([card('10'), card('2')], card('3'), neither).action, 'hit')
+  assert.equal(Core.getBasicStrategy([card('10'), card('2')], card('4'), neither).action, 'stand')
+  assert.equal(Core.getBasicStrategy([card('10'), card('7')], card('A'), neither).action, 'stand')
+})
+
+test('getBasicStrategy: doubles only when doubling is allowed', () => {
+  const six5 = [card('6'), card('5')]
+  assert.equal(Core.getBasicStrategy(six5, card('6'), both).action, 'double')
+  assert.equal(
+    Core.getBasicStrategy(six5, card('6'), { canSplit: false, canDouble: false }).action,
+    'hit'
+  )
+})
+
+test('getBasicStrategy: pairs split only when splitting is allowed', () => {
+  assert.equal(Core.getBasicStrategy([card('A'), card('A')], card('10'), both).action, 'split')
+  assert.equal(Core.getBasicStrategy([card('8'), card('8')], card('10'), both).action, 'split')
+  assert.equal(Core.getBasicStrategy([card('9'), card('9')], card('7'), both).action, 'stand')
+  assert.equal(Core.getBasicStrategy([card('8'), card('8')], card('10'), neither).action, 'hit')
+})
+
+test('getBasicStrategy: soft 18 stands when it cannot double instead of hitting', () => {
+  const soft18 = [card('A'), card('7')]
+  assert.equal(Core.getBasicStrategy(soft18, card('5'), both).action, 'double')
+  assert.equal(Core.getBasicStrategy(soft18, card('5'), neither).action, 'stand')
+  assert.equal(Core.getBasicStrategy(soft18, card('9'), both).action, 'hit')
+})
+
+test('getBasicStrategy: keeps the hint wording and returns nothing without an upcard', () => {
+  assert.equal(Core.getBasicStrategy([card('A'), card('A')], card('5'), both).text, 'Split aces.')
+  assert.equal(
+    Core.getBasicStrategy([card('6'), card('5')], card('6'), both).text,
+    'Double if allowed, otherwise hit.'
+  )
+  assert.equal(Core.getBasicStrategy([card('6'), card('5')], null, both), null)
+})
+
+test('gradeDecision compares the played action to the recommendation', () => {
+  const rec = Core.getBasicStrategy([card('10'), card('6')], card('10'), neither)
+  assert.equal(Core.gradeDecision(rec, 'hit'), true)
+  assert.equal(Core.gradeDecision(rec, 'stand'), false)
+  assert.equal(Core.gradeDecision(null, 'hit'), null)
+})
+
+test('formatAccuracy shows a dash until something was graded', () => {
+  assert.equal(Core.formatAccuracy({ graded: 0, optimal: 0 }), '-')
+  assert.equal(Core.formatAccuracy({ graded: 8, optimal: 7 }), '88% (7/8)')
+})
