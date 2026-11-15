@@ -1,41 +1,30 @@
 # Blackjack Studio
 
-A portfolio-grade blackjack simulator built with vanilla HTML, CSS, and JavaScript.
+A browser blackjack game built with vanilla HTML, CSS and JavaScript. It has no framework and no build step.
 
-## Why this project is portfolio-ready
-
-- Clear product framing and visual identity (casino-inspired interface, responsive layout, polished typography).
-- Stateful game engine with multi-deck shoe behavior and reliable hand resolution logic.
-- Advanced gameplay support: split, double down, insurance, and surrender.
-- Daily Challenge mode with deterministic seeded shoe for comparable runs.
-- Strategy-hint mode that can be toggled on/off.
-- Persistent data layer using `localStorage` for profile, stats, achievements, and history.
-- Accessibility-aware interactions: semantic regions, keyboard shortcuts, live status updates, and reduced-motion support.
-- Modular architecture with a reusable core logic layer and automated test coverage.
-
-## Feature set
+## Features
 
 ### Gameplay
 - 6-deck shoe with reshuffle behavior.
-- Deterministic Daily Challenge shoe keyed by local date.
+- Daily Challenge: a seeded shoe keyed by local date, limited to 20 rounds per day (`DAILY_ROUND_LIMIT`).
 - Standard hand actions: Hit, Stand, Double, Split, Insurance, Surrender.
 - Split up to 4 hands.
 - Split aces follow one-card rule.
-- Dealer stands on all 17 values.
+- Dealer stands on 17 (`DEALER_STAND_TOTAL` in `blackjack-core.js`).
 - Blackjack payout 3:2.
 
-### Analytics + progression
-- Session-independent stats and bankroll persistence.
+### Stats and progression
+- Stats, bankroll, achievements and history persist in `localStorage`.
 - Win/loss/push tracking, streak tracking, and net profit calculations.
 - Achievement system with unlock notifications.
 - Recent-hands feed with per-round net result.
 - Shareable Daily Challenge result summary.
 
-### UX quality
+### Interface
 - Keyboard support: `H`, `S`, `D`, `P`, `I`, `R`.
 - Quick bet controls (`Undo`, `Clear`) and chip-based betting UX.
-- Sound toggle and hint toggle.
-- Mobile and desktop optimized layout.
+- Sound toggle and strategy-hint toggle.
+- Responsive layout, semantic regions, live status updates and `prefers-reduced-motion` support.
 
 ## Tech stack
 
@@ -43,24 +32,30 @@ A portfolio-grade blackjack simulator built with vanilla HTML, CSS, and JavaScri
 - CSS3
 - Vanilla JavaScript (ES6+)
 - `http-server` for local serving
+- Biome for lint and format
+- PostHog analytics (`posthog.js`), loaded from `us.posthog.com`
 - Node built-in test runner (`node:test`) for deterministic unit tests
 
 ## Project structure
 
 ```text
 blackjack-game/
-├── blackjack-core.js
-├── .github/workflows/ci.yml
+├── blackjack-core.js     pure game logic
+├── cards.js
 ├── index.html
 ├── index.css
-├── index.js
-├── tests/blackjack-core.test.js
+├── index.js              engine and UI
+├── posthog.js            analytics loader
+├── sounds/               chip, deal, win, lose
+├── tests/                blackjack-core.test.js, storage.test.js
+├── .github/workflows/
 ├── package.json
-├── pnpm-lock.yaml
 └── README.md
 ```
 
 ## Run locally
+
+Requires Node.js 22 (as in CI) and pnpm.
 
 ```bash
 pnpm install
@@ -69,27 +64,34 @@ pnpm start
 
 Open `http://127.0.0.1:8080`.
 
-## Validate locally
+## Test and lint
 
 ```bash
-pnpm test
+pnpm test           # node:test suites, plus node --check on each script
+pnpm biome:check    # lint and format check
+pnpm check          # biome:check, test and build
 ```
 
 ## Quality gates
 
-- Core logic tests: `tests/blackjack-core.test.js`
-- Browser script syntax check: `node --check index.js`
-- CI pipeline: `.github/workflows/ci.yml` runs on pushes and pull requests
+- Tests: `tests/blackjack-core.test.js` and `tests/storage.test.js`.
+- CI: `.github/workflows/ci.yml` runs on pushes and pull requests.
 
-## Notes for reviewers
+## Code map
 
-- Main engine and UI logic live in `index.js`.
-- Pure blackjack logic lives in `blackjack-core.js`.
-- Visual system and responsiveness live in `index.css`.
-- Accessibility and semantic document structure live in `index.html`.
+- `index.js`: round engine and UI logic.
+- `blackjack-core.js`: pure blackjack logic.
+- `index.css`: visual system and responsiveness.
+- `index.html`: document structure and accessibility markup.
 
-## Next improvements (optional)
+## Analytics
 
-- Add deterministic test coverage for full round-state transitions in `index.js`.
-- Add smoke-style browser tests (Playwright) for key UI flows.
-- Add optional card-count trainer mode.
+`posthog.js` loads PostHog from `us.posthog.com` with a project key that is public by design (see `.gitleaksignore`). Remove the `posthog.js` script tag in `index.html` to run without analytics.
+
+## Roadmap
+
+Not built yet: full round-state tests for `index.js`, browser smoke tests (Playwright) and a card-count trainer mode.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
