@@ -22,7 +22,7 @@
     "web-game"
   ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "2.6.4",
     "http-server": "14.1.1"
