@@ -171,6 +171,7 @@ let savedRound = null
 let savedShoe = null
 let suppressDealAnimation = false
 let resumeNotice = ''
+let storageAvailable = true
 let resetTimer = null
 let audioContext = null
 
@@ -206,6 +207,7 @@ function cacheElements() {
     'set-name-btn',
     'player-el',
     'message-el',
+    'storage-warning',
     'dealer-phase',
     'dealer-cards',
     'dealer-sum-el',
@@ -1663,7 +1665,17 @@ function playSound(type) {
   }
 }
 
+function useSessionOnlyStorage() {
+  storageAvailable = false
+  const warning = elements['storage-warning']
+  if (warning) {
+    warning.textContent = 'Storage unavailable: playing in this session only. Progress and Daily Challenge records may be lost when you reload or close this tab.'
+    warning.hidden = false
+  }
+}
+
 function saveGame() {
+  if (!storageAvailable) return
   const resumable = round.phase === 'player-turn' || round.phase === 'dealer-turn'
   if (challenge.active) {
     challenge.drawn = SHOE_SIZE - shoe.length
@@ -1681,11 +1693,21 @@ function saveGame() {
     shoe: resumable && !challenge.active ? Core.encodeShoe(shoe) : null,
   }
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
+  } catch {
+    useSessionOnlyStorage()
+  }
 }
 
 function loadGame() {
-  const raw = localStorage.getItem(STORAGE_KEY)
+  let raw
+  try {
+    raw = localStorage.getItem(STORAGE_KEY)
+  } catch {
+    useSessionOnlyStorage()
+    return
+  }
   if (!raw) {
     return
   }
